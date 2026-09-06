@@ -17,4 +17,17 @@ test("published configuration examples parse and API documents every reason", as
   const api = await readFile("docs/api.md", "utf8");
   for (const reason of REASONS)
     assert.ok(api.includes(`\`${reason}\``), `Undocumented reason ${reason}`);
+  const readme = await readFile("README.md", "utf8");
+  const configuration = await readFile("docs/configuration.md", "utf8");
+  const compatibility = await readFile("docs/compatibility.md", "utf8");
+  for (const command of [
+    "/model-roles auto-setup",
+    "/model-roles auto-setup review",
+    "/model-roles auto-setup cancel",
+  ]) {
+    assert.ok(readme.includes(command), `README missing ${command}`);
+    assert.ok(configuration.includes(command), `configuration missing ${command}`);
+  }
+  assert.match(readme, /one to eight/i);
+  assert.match(compatibility, /cannot make arbitrary normal-agent tools read-only/i);
 });

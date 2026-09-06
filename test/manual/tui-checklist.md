@@ -29,6 +29,17 @@ The separate [GitHub installation flow](../../README.md#install-from-github) req
 - [ ] Long provider/model names remain usable at 40, 80, and 120 columns. Resize with a dialog or selector loader open; no rendering exceptions or unusable controls occur.
 - [ ] Light/dark themes show visible focus, keyboard selection, Escape behavior, and readable status without relying solely on color.
 
+## Auto Setup research and review
+
+- [ ] In a disposable primary TUI session, open **Auto Setup**, choose one to eight cached models with keyboard-only Space/arrow or j/k/Enter controls, and verify Escape makes no Auto Setup request or role-file change. Try long/non-English model IDs at 40, 80, and 120 columns in light and dark themes.
+- [ ] Read the start disclosure. Verify it names the current model, distinguishes normal model/tool data flow and possible charges from future selector charges, says tools are not sandboxed, and explains the offline/no-evidence fallback.
+- [ ] With an approved synthetic or fake search setup, verify a proposal remains unavailable until the normal agent settles, then review source status/URLs/dates/caveats, unresolved identity, offline/no-evidence, and a report that recommends no configuration change. Do not mark live-provider behavior passed without separate approval.
+- [ ] Use **Discuss/refine** with keyboard and IME-composed text. Verify it creates a new explicit setup exchange, ordinary chat is not silently captured, and the model/effort do not change during guarded research/refinement.
+- [ ] Cancel while a setup turn has active tools. Verify the command returns promptly, proposal authority is revoked, no role YAML changes, and the UI explains when Escape is needed for remaining normal-agent work.
+- [ ] Review a proposal against existing roles. Verify keep/add, individual replacements, changed-default choice, and destructive replace-custom-roles confirmation show the exact diff. Decline each confirmation, including first-custom-role routing disclosure, and verify YAML remains unchanged.
+- [ ] Confirm an additive proposal while an unrelated saved role is unavailable; the unchanged role remains with its warning. Change YAML in another session before final confirmation and verify Auto Setup requires a fresh review rather than forcing a save.
+- [ ] Reload/navigate after a settled draft and verify it is review-only. Exercise a malformed/cancelled/applied marker with synthetic session data when supported; no historical draft should silently become actionable.
+
 ## Selection and user control
 
 - [ ] Submit an idle task with eligible custom roles. The selector runs once on default and execution uses the selected role. Tools and queued follow-ups retain that model.

@@ -1,0 +1,18 @@
+export const AUTO_SETUP_LIMITS = Object.freeze({
+  candidates: 8,
+  sourcesPerCandidate: 3,
+  sourcesTotal: 24,
+  customRoles: 31,
+  url: 2048,
+  assessment: 1500,
+  roleRationale: 1000,
+  effortRationale: 500,
+  caveatsPerCandidate: 4,
+  caveat: 500,
+  sourceTitle: 500,
+  sourceField: 500,
+  reportSummary: 2000,
+  toolArgumentsBytes: 64 * 1024,
+  customEntryBytes: 64 * 1024,
+  promptBytes: 32 * 1024,
+});

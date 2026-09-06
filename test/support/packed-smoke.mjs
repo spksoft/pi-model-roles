@@ -23,6 +23,9 @@ assert.equal(decision.status, "selected");
 const pi = {
   events: createEventBus(),
   registerCommand: (name, command) => commands.set(name, command),
+  registerTool() {},
+  getActiveTools: () => [],
+  setActiveTools() {},
   on: (event, handler) => handlers.set(event, handler),
   appendEntry() {},
   setModel: async () => {

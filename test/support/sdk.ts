@@ -27,6 +27,7 @@ export async function sdkHarness(
     roleExtension?: InlineExtension | false;
     mode?: "tui" | "json" | "rpc" | "print";
     child?: boolean;
+    tools?: string[];
     prepare?: (dir: string, faux: FauxProviderHandle) => Promise<void>;
   } = {},
 ) {
@@ -99,7 +100,7 @@ export async function sdkHarness(
     settingsManager: settings,
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(dir),
-    tools: [],
+    ...(options.tools === undefined ? {} : { tools: options.tools }),
   });
   await session.bindExtensions({
     mode: options.mode ?? "tui",

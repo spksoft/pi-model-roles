@@ -96,11 +96,26 @@ Run these commands **inside Pi**, not in your shell:
 | `/model-roles use quick` | Apply the named role now without classification, then pause automatic routing. Replace `quick` with your role ID. Check status if the role's model is unavailable. |
 | `/model-roles pause` | Keep the current model and effort for this session. |
 | `/model-roles auto` | Clear the session pause; route the next eligible prompt if global routing is enabled. Does not send a request immediately. |
+| `/model-roles auto-setup` | Select up to eight available models and begin a separately confirmed research-and-recommendation pass. |
+| `/model-roles auto-setup review` | Review the latest settled Auto Setup proposal, discuss/refine it, or explicitly apply/cancel it. |
+| `/model-roles auto-setup cancel` | Immediately revoke a pending Auto Setup proposal. If its normal agent turn is still running, Pi cancellation remains cooperative. |
 | `/model-roles reload` | Reload saved roles and inherited defaults without clearing the session pause. |
 
 The menu also offers **Disable automatic routing** (saved globally), **Enable automatic routing**, and **Reset configuration**. Disabling keeps your roles and current model; reset deletes custom roles after confirmation. Other open sessions see saved changes after reload.
 
 **Escape during the selector loader cancels the submitted task**, restores its text, and prevents execution. Images may need reattachment. If a model switch is already underway, wait for it to finish before changing sessions; see the [model-switch limitation](docs/compatibility.md#model-switch-limitation).
+
+## Auto Setup
+
+**Auto Setup is optional and confirmation-first.** In a primary TUI session, choose **Auto Setup** from `/model-roles` or run `/model-roles auto-setup`, select one to eight currently available models, then confirm that the **currently active Pi model** may perform a normal agent research turn. Auto Setup never switches that model or its thinking level.
+
+The active agent may use whichever tools you have configured. It should search first-party provider material for each exact selected model and submit a report with agent-reported source URLs, dates, benchmark conditions, caveats, and role recommendations. Source URLs are **not independently verified** by this package; a report can mix first-party citations, no-official-evidence-found, offline knowledge, and unresolved model identity. Offline knowledge means no web evidence was collected—it is not a local/offline model run and still uses your active model provider's normal data flow.
+
+The package does not bundle a search service, credentials, or a tool sandbox. The research instruction asks the normal agent not to modify files, but other configured tools retain their normal permissions. After the agent settles, run `/model-roles auto-setup review` to inspect the report, ask a guarded **Discuss/refine** question, start over, cancel, or review an exact configuration diff. Ordinary chat is not Auto Setup discussion. Nothing in research or discussion writes role YAML.
+
+On confirmation, Auto Setup asks whether to keep conflicting roles, replace selected conflicts, or replace all custom roles after a separate destructive warning. It preserves `enabled`, `selectorTimeoutMs`, untouched roles (including temporarily unavailable ones), your current model/effort, and your session's pause state. If it adds your first custom role, you separately confirm the future selector request's cost/privacy disclosure. A changed or invalid configuration must be reviewed again; a restored session draft is review-only until you take a fresh action.
+
+Use **Cancel** to revoke Auto Setup's proposal authority immediately. The package aborts only a turn it can identify as its own; otherwise use Pi's Escape control to stop the normal agent. Cancellation cannot undo already completed provider/tool requests or their charges. Detailed limits, recovery, privacy, and evidence semantics are in [configuration](docs/configuration.md#auto-setup).
 
 ## Settings
 
@@ -134,6 +149,7 @@ Adding custom roles enables an extra request before eligible tasks, adding **lat
 | --- | --- |
 | Default selector provider | Submitted task text and eligible role descriptions. No separately loaded files, conversation history, tools, or image bytes. Text pasted into your task is still task text. |
 | Selected execution provider | Pi's normal conversation, instructions, and attachments. Changing providers can send existing conversation context to another configured provider. |
+| Auto Setup active model and its configured tools | Only after its own start confirmation: the normal agent research/discussion message, normal conversation/provider flow, and any tool-specific requests. Tool providers may charge or retain data under their own policies. The package saves bounded proposal/report metadata in normal Pi session history, not credentials or raw fetched pages. |
 
 Role descriptions are saved in your YAML configuration. The package saves safe decision metadata in Pi's session entries, but does not duplicate task text or descriptions there. It creates no routing log, prompt cache, or telemetry; Pi continues to save its ordinary session history. Selector usage is separate from execution usage and may not appear in Pi's usual totals.
 

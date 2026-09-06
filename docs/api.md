@@ -6,6 +6,8 @@ This guide is for extension and SDK authors. **Regular Pi users only need `/mode
 
 The API answers one question: **which model and thinking effort should handle this task?** It returns a decision. Your integration still applies the model, prepares context, checks permissions, and runs the task through its existing execution path.
 
+Auto Setup is intentionally **not** a public research/search API. It is a primary-TUI workflow inside this package that uses the current normal Pi agent and the user's configured tools, stores a review draft, and requires an explicit YAML confirmation. It does not expose cross-extension web-tool execution, provider credentials, benchmark data, or a new selection API contract.
+
 ## Choose an integration
 
 | Your host | Use | Who supplies configuration? |

@@ -1,33 +1,14 @@
 import type { ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { validateConfig } from "../config/schema.js";
 import { LIMITS, RESERVED_IDS, ROLE_ID } from "../core/defaults.js";
 import { displayModel, sameModel } from "../core/model-identity.js";
 import type { DefaultRole, Effort, RoleConfig } from "../core/types.js";
 import { availableModels } from "../pi/adapters.js";
+import type { AutoSetupController } from "../pi/auto-setup-controller.js";
 import type { RolesController } from "../pi/controller.js";
+import { reviewAutoSetup, startAutoSetup } from "./auto-setup.js";
+import { confirmFirstCustomRoleRouting, saveRoleConfig } from "./config-save.js";
 export function roleSummary(id: string, role: DefaultRole): string {
   return `${id} — ${role.model === "inherit" ? "inherit Pi default" : displayModel(role.model)} · ${role.effort}`;
-}
-async function save(
-  controller: RolesController,
-  ctx: ExtensionContext,
-  config: RoleConfig,
-  revision: string,
-): Promise<boolean> {
-  try {
-    validateConfig(config);
-    controller.invalidate();
-    await controller.store.save(config, revision);
-    controller.status(ctx);
-    ctx.ui.notify("Model roles saved. Other sessions pick up changes on reload.", "info");
-    return true;
-  } catch {
-    ctx.ui.notify(
-      "Could not save roles: invalid data, conflicting edit, or busy/unwritable file. Reload before reapplying; never force overwrite. For an abandoned lock, verify no writer is running before removing config.yaml.lock.",
-      "warning",
-    );
-    return false;
-  }
 }
 async function editRole(
   controller: RolesController,
@@ -112,16 +93,8 @@ async function editRole(
     ))
   )
     return;
-  if (Object.keys(snapshot.config.roles).length === 1 && id !== "default") {
-    if (
-      !(await ctx.ui.confirm(
-        "Enable task-based model selection?",
-        "Each new idle interactive prompt may make one extra request to the default provider (cost and latency). That request includes submitted task text and role descriptions. The selected execution provider receives the normal conversation. No history or images go to the selector.",
-      ))
-    )
-      return;
-  }
-  await save(controller, ctx, draft, snapshot.revision);
+  if (!(await confirmFirstCustomRoleRouting(ctx, snapshot.config, draft))) return;
+  await saveRoleConfig(controller, ctx, draft, snapshot.revision);
 }
 async function manageRole(
   controller: RolesController,
@@ -145,7 +118,7 @@ async function manageRole(
       return;
     const draft = structuredClone(snapshot.config);
     delete draft.roles[id];
-    await save(controller, ctx, draft, snapshot.revision);
+    await saveRoleConfig(controller, ctx, draft, snapshot.revision);
   }
 }
 async function reset(controller: RolesController, ctx: ExtensionContext): Promise<void> {
@@ -168,7 +141,11 @@ async function reset(controller: RolesController, ctx: ExtensionContext): Promis
     );
   }
 }
-export async function showMenu(controller: RolesController, ctx: ExtensionContext): Promise<void> {
+export async function showMenu(
+  controller: RolesController,
+  setup: AutoSetupController,
+  ctx: ExtensionCommandContext,
+): Promise<void> {
   while (controller.active) {
     const snapshot = controller.store.snapshot;
     const roles = Object.entries(snapshot?.config.roles ?? {}).sort(([a], [b]) =>
@@ -187,6 +164,7 @@ export async function showMenu(controller: RolesController, ctx: ExtensionContex
     });
     const controls = [
       "Add role",
+      "Auto Setup",
       controller.mode === "manual" ? "Resume auto-routing" : "Pause routing",
       snapshot?.config.enabled ? "Disable automatic routing" : "Enable automatic routing",
       "Status",
@@ -206,13 +184,18 @@ export async function showMenu(controller: RolesController, ctx: ExtensionContex
       continue;
     }
     if (choice === "Add role") await editRole(controller, ctx);
-    else if (choice === "Resume auto-routing") controller.resume(ctx);
+    else if (choice === "Auto Setup") {
+      const launched = setup.currentDraft
+        ? await reviewAutoSetup(controller, setup, ctx)
+        : await startAutoSetup(setup, ctx);
+      if (launched) return;
+    } else if (choice === "Resume auto-routing") controller.resume(ctx);
     else if (choice === "Pause routing") controller.pause(ctx);
     else if (choice === "Reload") await controller.reload(ctx);
     else if (choice === "Reset configuration") await reset(controller, ctx);
     else if (choice === "Status") showStatus(controller, ctx);
     else if (snapshot)
-      await save(
+      await saveRoleConfig(
         controller,
         ctx,
         { ...snapshot.config, enabled: !snapshot.config.enabled },
@@ -229,6 +212,7 @@ export function showStatus(controller: RolesController, ctx: ExtensionContext): 
 }
 export async function handleCommand(
   controller: RolesController,
+  setup: AutoSetupController,
   args: string,
   ctx: ExtensionCommandContext,
 ): Promise<void> {
@@ -240,14 +224,25 @@ export async function handleCommand(
       );
     return;
   }
-  await ctx.waitForIdle();
   const parts = args.trim().split(/\s+/);
   const action = parts[0];
-  if (!action || action === "settings") await showMenu(controller, ctx);
+  if (action === "auto-setup" && parts[1] === "cancel") {
+    setup.cancel(ctx);
+    return;
+  }
+  await ctx.waitForIdle();
+  if (!action || action === "settings") await showMenu(controller, setup, ctx);
   else if (action === "status") showStatus(controller, ctx);
   else if (action === "reload") await controller.reload(ctx);
   else if (action === "pause") controller.pause(ctx);
   else if (action === "auto") controller.resume(ctx);
   else if (action === "use" && parts[1]) await controller.use(ctx, parts[1]);
-  else ctx.ui.notify("Use /model-roles [settings|status|reload|pause|auto|use <role>].", "info");
+  else if (action === "auto-setup" && !parts[1]) await startAutoSetup(setup, ctx);
+  else if (action === "auto-setup" && parts[1] === "review")
+    await reviewAutoSetup(controller, setup, ctx);
+  else
+    ctx.ui.notify(
+      "Use /model-roles [settings|status|reload|pause|auto|auto-setup [review|cancel]|use <role>].",
+      "info",
+    );
 }

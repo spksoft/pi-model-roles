@@ -19,6 +19,22 @@ For most users, **`/model-roles` is the only configuration tool needed**. Use it
 
 The default role cannot be deleted or renamed. Menu edits remain drafts until confirmed, and cancelling leaves the model and file unchanged. Saving a role does not immediately switch the execution model; **Use for this session** does.
 
+## Auto Setup
+
+Auto Setup is a primary-TUI workflow for researching **one to eight** cached available models and proposing ordinary role changes. It has no YAML settings and does not configure providers, credentials, search services, or Pi's tool permissions.
+
+1. Run `/model-roles auto-setup` or select **Auto Setup** in the menu, then choose models with Space and continue with Enter.
+2. Read and confirm the disclosure. Research uses the **current Pi model** without switching it. The model receives its normal Pi conversation/provider flow and may use the tools you already configured. Tool providers can make requests, charge, or retain data under their own policies. Auto Setup does not sandbox them.
+3. The normal agent should research first-party material for every exact selected provider/model ID and submit a structured report. It may instead report that no official evidence was found, that it used offline knowledge, or that a serving-model identity could not be resolved. A source URL is agent-reported and user-reviewable, not independently verified by this package. Offline knowledge means no web evidence was collected; it is not a local model run.
+4. When Pi reports the proposal settled, run `/model-roles auto-setup review`. Inspect per-model evidence state, dates, benchmark conditions/caveats, recommendations and the exact role diff. **Discuss/refine** sends a new guarded normal-agent message. Ordinary chat is not captured as Auto Setup discussion.
+5. Choose whether to keep conflicts, replace individual conflicting roles, or replace all custom roles after a destructive confirmation. Confirm the final diff. Research and discussion alone never write `config.yaml`.
+
+Auto Setup preserves `enabled`, `selectorTimeoutMs`, untouched roles, the session's routing mode, and the current model/effort. An unchanged unavailable role does not prevent an otherwise valid proposed addition; a model/effort newly added or changed must still be cached as available and supported at save time. A suggested default replacement is separate and never implicit. Adding the first custom role also shows the normal future-selector cost/provider disclosure; research consent does not grant that permission.
+
+The proposal is bounded to eight models, three source records per model (24 total), 31 custom suggestions, 2,048-character URLs, 1,500-character assessments, 1,000-character role rationales, 500-character effort rationales/caveats, 64 KiB tool/session payloads, and 32 KiB generated prompts. Inputs beyond these bounds are rejected, never silently truncated. The package stores only bounded report/draft state in Pi custom session entries, not live request tokens, credentials, raw fetched pages, or deliberately copied conversation text. Bounded generated report text can still contain unwanted material; do not treat this as a secret-detection guarantee.
+
+`/model-roles auto-setup cancel` revokes pending proposal authority before waiting for Pi to become idle. It aborts only a research turn it can identify as its own; otherwise press Escape to stop the ordinary agent. It cannot reverse completed requests, charges, or tool effects. A valid restored proposal is review-only. A malformed, unknown-version, cancelled, or applied latest Auto Setup session marker is non-actionable and never revives an older draft. If configuration changes after research, reload/check it and review a new exact diff before saving. If configuration saves but its session applied marker cannot be recorded, the role file is already saved; the package reports a warning and does not retry.
+
 Pausing is session-specific; disabling is a saved global setting. `/model-roles auto` clears the session pause but does not override `enabled: false`. Enable global routing in the menu as well if needed. Neither action sends a selector request immediately.
 
 ## Write useful role descriptions

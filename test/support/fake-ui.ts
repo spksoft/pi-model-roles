@@ -4,6 +4,7 @@ export function fakeUI() {
   const notifications: string[] = [];
   const statuses = new Map<string, string>();
   const answers: Array<string | boolean | undefined> = [];
+  const customAnswers: unknown[] = [];
   const selections: Array<{ title: string; options: string[] }> = [];
   let editor = "";
   let cancelLoader = false;
@@ -48,7 +49,8 @@ export function fakeUI() {
         );
         Promise.resolve(created).then((value) => {
           component = value;
-          if (cancelLoader) component.handleInput?.("\u001b");
+          if (customAnswers.length) done(customAnswers.shift());
+          else if (cancelLoader) component.handleInput?.("\u001b");
         });
       }),
   } as unknown as ExtensionUIContext;
@@ -57,6 +59,7 @@ export function fakeUI() {
     notifications,
     statuses,
     answers,
+    customAnswers,
     selections,
     get editor() {
       return editor;

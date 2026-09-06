@@ -32,6 +32,14 @@ GitHub install/update/remove syntax follows [Pi's package documentation](https:/
 
 The package uses Pi's cached model availability and capabilities. It does not probe providers on each task, change authentication, or bypass model scope and launcher permissions. Structurally valid roles can remain saved even when their models are temporarily unavailable.
 
+## Auto Setup boundary
+
+Auto Setup uses Pi **0.85.1** public normal-agent, `agent_settled`, dynamic-tool, custom-entry, and primary-TUI APIs. It is not available in print, JSON, RPC, headless, or known subagent sessions. It selects up to eight cached available models and asks the current Pi model to research them without switching model or effort.
+
+The current agent may use configured web/search tools, but pi-model-roles does not invoke another extension's tool directly, bundle a search provider, add credentials, or change tool permissions. The package can restrict its own proposal handoff to a draft-only tool; it **cannot make arbitrary normal-agent tools read-only**. Research instructions request no file/configuration changes, but users must understand their active tool permissions before confirming. Agent-reported citations and provider/upstream mappings remain reviewable claims, not independently verified facts; guessed aliases are not accepted for role assignments.
+
+A report is ready only after Pi's normal agent run settles, including retries or queued work. `/model-roles auto-setup cancel` revokes Auto Setup authority immediately, but provider/tool cancellation is cooperative and cannot undo completed effects or charges. The package aborts only a turn it identifies as its own; use Escape for any other active Pi work. Restored drafts are review-only and malformed/latest cancelled/applied history is deliberately non-actionable.
+
 ## Troubleshooting
 
 Start with `/model-roles status` for the latest decision, then open `/model-roles` to inspect roles and warnings. A fallback is an expected recovery path, not necessarily an error.
@@ -49,6 +57,10 @@ Start with `/model-roles status` for the latest decision, then open `/model-role
 | Role model or effort is unavailable | Configure the provider in Pi or edit the role. The menu shows supported effort levels; older saved values may be clamped with a warning. |
 | Escape restored text but not an image | Selection was cancelled and the task was not run. Reattach the image before submitting again. |
 | YAML cannot be loaded or saved | Follow [configuration recovery](configuration.md#recover-from-a-problem). Do not force an overwrite or delete a lock while another process may be writing. |
+| Auto Setup report never becomes reviewable | The active agent may have produced prose without calling the structured proposal tool. Wait until it settles, then start again or use manual role editing. |
+| Auto Setup cites no web sources | The current model may lack usable search tools, have found no official source, or have used explicitly labelled offline knowledge. Treat all agent-reported citations as reviewable claims. |
+| Auto Setup says the config changed | Another session or manual YAML edit changed the revision. Keep the evidence, then start/review again against the current config; do not force an overwrite. |
+| Auto Setup cancellation did not stop visible work | Proposal authority was revoked. The remaining normal-agent work may be unrelated or cancellation may be cooperative; use Escape when appropriate. |
 
 Task text beyond 16,384 Unicode characters, blank/image-only input, or an insufficient selector context budget skips classification and uses fallback. See [all limits](configuration.md#advanced-limits-and-safeguards).
 
