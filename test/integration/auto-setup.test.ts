@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fauxAssistantMessage, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
+import {
+  fauxAssistantMessage,
+  type FauxResponseFactory,
+  fauxText,
+  fauxToolCall,
+} from "@earendil-works/pi-ai";
 import { ConfigStore } from "../../src/config/store.js";
 import { AUTO_SETUP_TOOL } from "../../src/pi/auto-setup-controller.js";
 import { sdkHarness } from "../support/sdk.js";
@@ -43,9 +48,12 @@ function offlineProposal() {
   };
 }
 
-async function submitResearch(h: Awaited<ReturnType<typeof sdkHarness>>) {
-  h.ui.customAnswers.push([defaultModel, fastModel]);
-  h.ui.answers.push(true);
+async function submitResearch(
+  h: Awaited<ReturnType<typeof sdkHarness>>,
+  reviewAnswers: Array<string | boolean> = [],
+) {
+  h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel]);
+  h.ui.answers.push(true, ...reviewAnswers);
   h.respond(
     (context) => {
       const message = context.messages.at(-1);
@@ -61,16 +69,15 @@ async function submitResearch(h: Awaited<ReturnType<typeof sdkHarness>>) {
     },
     fauxAssistantMessage([fauxText("Submitted.")]),
   );
-  await h.session.prompt("/model-roles auto-setup");
+  await h.session.prompt("/model-roles settings");
   await h.session.waitForIdle();
+  await new Promise<void>((resolve) => setTimeout(resolve, 10));
 }
 
 test("confirmed Auto Setup save preserves the active model and writes only the reviewed role diff", async () => {
   const h = await sdkHarness();
   try {
-    await submitResearch(h);
-    h.ui.answers.push("Confirm settings", true, true);
-    await h.session.prompt("/model-roles auto-setup review");
+    await submitResearch(h, ["Confirm settings", true, true]);
     const snapshot = await new ConfigStore(h.dir).load(false);
     assert.ok(snapshot);
     const quick = snapshot.config.roles.quick;
@@ -85,15 +92,67 @@ test("confirmed Auto Setup save preserves the active model and writes only the r
   }
 });
 
-test("Auto Setup cancellation makes no configuration write", async () => {
+test("Auto Setup automatically reviews both research and a refined proposal", async () => {
   const h = await sdkHarness();
   try {
-    await h.session.prompt("/model-roles auto-setup cancel");
+    h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel]);
+    h.ui.answers.push(
+      true,
+      "Discuss/refine",
+      "Tighten the role boundary and keep the same evidence.",
+      "Close",
+    );
+    const submit: FauxResponseFactory = (context) => {
+      const message = context.messages.at(-1);
+      const content =
+        message?.role === "user" && Array.isArray(message.content) ? message.content[0] : undefined;
+      const text = content?.type === "text" ? content.text : "";
+      const requestId = JSON.parse(text.match(/requestId\s+("[^"]+")/)?.[1] ?? '""');
+      const generation = Number(text.match(/generation\s+(\d+)/)?.[1]);
+      assert.ok(requestId && generation);
+      return fauxAssistantMessage(
+        [fauxToolCall(AUTO_SETUP_TOOL, { requestId, generation, proposal: offlineProposal() })],
+        { stopReason: "toolUse" },
+      );
+    };
+    h.respond(
+      submit,
+      fauxAssistantMessage([fauxText("Initial proposal submitted.")]),
+      submit,
+      fauxAssistantMessage([fauxText("Refined proposal submitted.")]),
+    );
+
+    await h.session.prompt("/model-roles settings");
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    await h.session.waitForIdle();
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+
+    assert.equal(
+      h.faux.state.callCount,
+      4,
+      JSON.stringify({
+        messages: h.session.messages,
+        errors: h.errors,
+        notifications: h.ui.notifications,
+      }),
+    );
+    assert.equal(h.ui.selections.filter((item) => item.title === "Auto Setup proposal").length, 2);
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.close();
+  }
+});
+
+test("automatic Auto Setup review can cancel without a separate review command or configuration write", async () => {
+  const h = await sdkHarness();
+  try {
+    await submitResearch(h, ["Cancel proposal"]);
     const store = new ConfigStore(h.dir);
     const snapshot = await store.load(false);
     assert.ok(snapshot);
     assert.deepEqual(Object.keys(snapshot.config.roles), ["default"]);
-    assert.ok(h.ui.notifications.some((message) => message.includes("no active research")));
+    assert.ok(h.ui.selections.some((item) => item.title === "Auto Setup proposal"));
+    assert.ok(h.ui.notifications.some((message) => message.includes("Auto Setup cancelled")));
   } finally {
     await h.close();
   }

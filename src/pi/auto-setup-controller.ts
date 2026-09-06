@@ -53,6 +53,7 @@ export class AutoSetupController {
   private runtime?: RuntimeRequest;
   private draft?: AutoSetupDraft;
   private status: AutoSetupStatus = "idle";
+  private automaticReviewRequestId?: string;
 
   constructor(
     private readonly pi: ExtensionAPI,
@@ -71,6 +72,7 @@ export class AutoSetupController {
   start(ctx: ExtensionContext): void {
     this.active = this.isPrimaryActive();
     this.runtime = undefined;
+    this.automaticReviewRequestId = undefined;
     this.removeTool();
     if (!this.active) return;
     const restored = restoreAutoSetupDraft(ctx);
@@ -213,10 +215,10 @@ export class AutoSetupController {
     runtime.ownsTurn = true;
   }
 
-  agentSettled(ctx: ExtensionContext): void {
+  agentSettled(ctx: ExtensionContext): string | undefined {
     const runtime = this.runtime;
     if (!runtime || runtime.sessionId !== ctx.sessionManager.getSessionId() || !ctx.isIdle())
-      return;
+      return undefined;
     this.removeTool();
     this.runtime = undefined;
     if (runtime.phase === "settling" && runtime.accepted) {
@@ -229,23 +231,38 @@ export class AutoSetupController {
           state: "ready",
           draft: runtime.accepted,
         });
-        ctx.ui.notify("Auto Setup proposal is ready. Run /model-roles auto-setup review.", "info");
+        ctx.ui.notify("Auto Setup proposal is ready. Opening review.", "info");
       } catch {
         ctx.ui.notify(
           "Auto Setup proposal is ready for this session, but its review marker could not be saved. Do not rely on it after reload.",
           "warning",
         );
       }
-      return;
+      return runtime.requestId;
     }
     this.draft = runtime.previousDraft;
     this.status = this.draft ? "ready" : "idle";
     ctx.ui.notify(
       this.draft
-        ? "Auto Setup settled without a valid revision. The previous proposal remains available for review."
-        : "Auto Setup settled without a valid structured proposal. Start again or continue with manual role editing.",
+        ? "Auto Setup settled without a valid revision. The previous proposal remains available in Settings."
+        : "Auto Setup settled without a valid structured proposal. Start again from Settings or continue with manual role editing.",
       "warning",
     );
+    return undefined;
+  }
+
+  claimAutomaticReview(ctx: ExtensionContext, requestId: string): boolean {
+    if (
+      !this.active ||
+      !this.isPrimaryActive() ||
+      !ctx.isIdle() ||
+      this.status !== "ready" ||
+      this.draft?.requestId !== requestId ||
+      this.automaticReviewRequestId === requestId
+    )
+      return false;
+    this.automaticReviewRequestId = requestId;
+    return true;
   }
 
   submit(

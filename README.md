@@ -17,7 +17,7 @@ You need **Pi**, **Node.js 22.19.0 or newer**, **npm**, and **Git**. The tested 
 2. Start or restart Pi, or run `/reload` in an open session. Then enter:
 
    ```text
-   /model-roles
+   /model-roles settings
    ```
 
 No npm registry release or optional subagent package is required. Review third-party extension code before installing: Pi extensions run with your system access.
@@ -32,7 +32,7 @@ You can select `default` → **Edit** to choose a different model or effort for 
 
 ### Add a role
 
-1. Open `/model-roles` and press **A** to add a role.
+1. Open `/model-roles settings` and press **A** to add a role.
 2. Enter a short identifier, such as `quick`, then describe **when Pi should choose it**—for example: “Use for small, well-specified edits that do not require design decisions.”
 3. Choose an available model and a supported reasoning effort. **All model pickers—including role edits and `default`—show at most eight models per page** (fewer on short terminals). Type immediately to fuzzy-search provider/model IDs, use arrows and PgUp/PgDn to navigate, then Enter to select. Ctrl+U clears the query; Escape cancels. Models without reasoning use `off`.
 4. Review and confirm the save. The first custom-role save also explains the extra request, cost, and provider data flow.
@@ -46,7 +46,7 @@ Possible role descriptions—not built-in presets:
 
 Choose models you already use in Pi. Keep descriptions distinct: overlapping matches fall back to `default`. Descriptions are **selection criteria, not instructions to the executing model**. Keep actual coding or writing instructions in your prompt or `AGENTS.md`.
 
-Cancel any editing step with Escape to leave the draft unsaved. In the role manager, select a role with arrows (or `j`/`k`), then use **Enter** to edit, **U** to use it now, or **D** to delete it. The default role cannot be deleted.
+Cancel any editing step with Escape to leave the draft unsaved. **Auto Setup** is the first Settings item. Below it, role management is CRUD-only: press **A** to create, read the listed assignments and descriptions, **Enter** to update, or **D** to delete. The default role cannot be deleted. Use a role outside Settings with `/model-roles use <role>`.
 
 ## How it works
 
@@ -66,7 +66,7 @@ The **selector** is the extra request that chooses a role. The **execution model
 - **At most one selector request runs per eligible prompt**, with no retry and an 8-second default timeout. A failed, invalid, ambiguous, or timed-out response falls back safely.
 - **Fallback order is fixed:** configured `default` → inherited Pi baseline → current permitted, usable model. If none is usable, Pi or the API caller handles the error. The package never picks an arbitrary provider or replays an already-started task.
 - **Selection happens before Pi prepares and runs the task**, including its model checks and context compaction. The chosen model stays active through tools, retries, and queued follow-ups. The next new idle prompt can choose another role.
-- **Manual choices win.** Changing the model or thinking effort yourself pauses automatic routing. Explicit startup choices are preserved. Use `/model-roles auto` when you want automation again.
+- **Manual choices win.** Changing the model or thinking effort yourself disables Auto Selector for the session. Explicit startup choices are preserved. Use `/model-roles enable` when you want automatic routing again.
 
 The fallback rules are deterministic; the model's judgment about a description can vary. This is not a model benchmark or a guarantee of the cheapest or best result.
 
@@ -78,31 +78,26 @@ Run these commands **inside Pi**, not in your shell:
 
 | Command | What it does |
 | --- | --- |
-| `/model-roles` or `/model-roles settings` | Open role management and routing controls. |
-| `/model-roles status` | Show session mode, configuration path, and the latest decision, including fallback reason and selector usage when available. |
-| `/model-roles use quick` | Apply the named role now without classification, then pause automatic routing. Replace `quick` with your role ID. Check status if the role's model is unavailable. |
-| `/model-roles pause` | Keep the current model and effort for this session. |
-| `/model-roles auto` | Clear the session pause; route the next eligible prompt if global routing is enabled. Does not send a request immediately. |
-| `/model-roles auto-setup` | Select up to eight available models and begin a separately confirmed research-and-recommendation pass. |
-| `/model-roles auto-setup review` | Review the latest settled Auto Setup proposal, discuss/refine it, or explicitly apply/cancel it. |
-| `/model-roles auto-setup cancel` | Immediately revoke a pending Auto Setup proposal. If its normal agent turn is still running, Pi cancellation remains cooperative. |
-| `/model-roles reload` | Reload saved roles and inherited defaults without clearing the session pause. |
+| `/model-roles settings` | Open Auto Setup and CRUD-only role management. Bare `/model-roles` is a convenience alias. |
+| `/model-roles enable` | Enable Auto Selector. The next eligible prompt may route to another role; no selector request is sent immediately. |
+| `/model-roles disable` | Disable Auto Selector and keep the selected/current role, model, and effort pinned. |
+| `/model-roles use quick` | Apply the named role now without classification. Replace `quick` with your role ID. This does not change Auto Selector: if enabled, later prompts may route elsewhere; disable it to stay on `quick`. |
 
-The role manager shows global and session routing separately. Press **P** to pause/resume routing only for this session; **G** turns automatic routing on/off everywhere (a saved setting); **S** opens **Auto Setup (research recommendations)**; **R** reloads; and **X** resets configuration. Disabling keeps your roles and current model; reset deletes custom roles after confirmation. Other open sessions see saved changes after reload.
+These are the only `/model-roles` subcommands. The footer always shows `auto-selector=enabled` or `auto-selector=disabled` and the current role when known. Settings puts **Auto Setup** first and otherwise exposes role create/read/update/delete only. Other sessions load saved enable/disable and role changes after Pi's `/reload`.
 
 **Escape during the selector loader cancels the submitted task**, restores its text, and prevents execution. Images may need reattachment. If a model switch is already underway, wait for it to finish before changing sessions; see the [model-switch limitation](docs/compatibility.md#model-switch-limitation).
 
 ## Auto Setup
 
-**Auto Setup is optional and confirmation-first.** In a primary TUI session, choose **Auto Setup** from `/model-roles` or run `/model-roles auto-setup`, select one to eight currently available models, then confirm that the **currently active Pi model** may perform a normal agent research turn. It uses the same paginated, type-to-search model picker as role editing; Space or Tab toggles candidates, Enter continues, and Escape cancels. Selections survive searches and page changes. Auto Setup never switches that model or its thinking level.
+**Auto Setup is optional and confirmation-first.** In a primary TUI session, open `/model-roles settings`, choose the top **Auto Setup** item, select one to eight currently available models, then confirm that the **currently active Pi model** may perform a normal agent research turn. It uses the same paginated, type-to-search model picker as role editing; Space or Tab toggles candidates, Enter continues, and Escape cancels. Selections survive searches and page changes. Auto Setup never switches that model or its thinking level.
 
 The active agent may use whichever tools you have configured. It should search first-party provider material for each exact selected model and submit a report with agent-reported source URLs, dates, benchmark conditions, caveats, and role recommendations. The research and refinement prompts include a role-design rubric, good/bad few-shot descriptions, and an overlap self-check so recommendations remain small, task-observable, and distinct instead of creating one vague role per model. The handoff tool exposes a typed, bounded proposal schema, and the prompts explain the required field shapes. Unknown fields are rejected. If validation fails, the agent is instructed to correct the report and retry once rather than abandon it because of a single-call restriction. Source URLs are **not independently verified** by this package; a report can mix first-party citations, no-official-evidence-found, offline knowledge, and unresolved model identity. Offline knowledge means no web evidence was collected—it is not a local/offline model run and still uses your active model provider's normal data flow.
 
-The package does not bundle a search service, credentials, or a tool sandbox. The research instruction asks the normal agent not to modify files, but other configured tools retain their normal permissions. After the agent settles, run `/model-roles auto-setup review` to inspect the report, ask a guarded **Discuss/refine** question, start over, cancel, or review an exact configuration diff. Ordinary chat is not Auto Setup discussion. Nothing in research or discussion writes role YAML.
+The package does not bundle a search service, credentials, or a tool sandbox. The research instruction asks the normal agent not to modify files, but other configured tools retain their normal permissions. After research or refinement settles, Auto Setup opens the review automatically—no second command is required. Inspect the report, ask a guarded **Discuss/refine** question, start over, cancel, or review an exact configuration diff. If the review cannot open because the session is no longer idle, reopen it from the top of Settings. Ordinary chat is not Auto Setup discussion. Nothing in research or discussion writes role YAML.
 
 On confirmation, Auto Setup asks whether to keep conflicting roles, replace selected conflicts, or replace all custom roles after a separate destructive warning. It preserves `enabled`, `selectorTimeoutMs`, untouched roles (including temporarily unavailable ones), your current model/effort, and your session's pause state. If it adds your first custom role, you separately confirm the future selector request's cost/privacy disclosure. A changed or invalid configuration must be reviewed again; a restored session draft is review-only until you take a fresh action.
 
-Use **Cancel** to revoke Auto Setup's proposal authority immediately. The package aborts only a turn it can identify as its own; otherwise use Pi's Escape control to stop the normal agent. Cancellation cannot undo already completed provider/tool requests or their charges. Detailed limits, recovery, privacy, and evidence semantics are in [configuration](docs/configuration.md#auto-setup).
+Use Pi's Escape control to stop active research. Once a proposal opens for review, choose **Cancel proposal** to discard it. Cancellation cannot undo already completed provider/tool requests or their charges. Detailed limits, recovery, privacy, and evidence semantics are in [configuration](docs/configuration.md#auto-setup).
 
 ## Settings
 
@@ -126,7 +121,7 @@ roles:
     effort: inherit
 ```
 
-Use the menu for normal changes. For manual YAML edits, limits, and recovery, see [configuration](docs/configuration.md). Role edits never rewrite Pi's saved model defaults or authentication; Pi itself records package installation in its settings as usual.
+Use Settings for normal role CRUD and `/model-roles enable|disable` for Auto Selector. For manual YAML edits, limits, and recovery, see [configuration](docs/configuration.md). Role edits never rewrite Pi's saved model defaults or authentication; Pi itself records package installation in its settings as usual.
 
 ## Cost and privacy
 

@@ -51,7 +51,7 @@ test("pi-subagents 0.65.1: native public delegation receives selected model and 
     const snap = await store.load();
     assert.ok(snap);
     await store.save(config(), snap.revision);
-    await h.session.prompt("/model-roles reload");
+    await h.session.reload();
     h.respond(fauxAssistantMessage('{"matches":["fast"]}'), (_context, options, _state, model) => {
       assert.equal(model.id, "owner/fast");
       assert.equal(options?.reasoning, "low");

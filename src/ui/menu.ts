@@ -43,7 +43,7 @@ async function editRole(
   const old = draft.roles[id];
   if (id !== "default") {
     description = await ctx.ui.editor(
-      `${editing ? "Edit" : "Create"} role — step 2 of 4: when should Pi choose it?`,
+      `${editing ? "Edit" : "Create"} role — step 2 of 4: write a task-observable “Use when …” criterion; exclude model names and execution instructions`,
       old && "description" in old ? old.description : "",
     );
     if (description === undefined) return;
@@ -117,31 +117,45 @@ async function deleteRole(
   await saveRoleConfig(controller, ctx, draft, snapshot.revision);
 }
 
-async function reset(controller: RolesController, ctx: ExtensionContext): Promise<void> {
-  if (
-    !(await ctx.ui.confirm(
-      "Reset model-role configuration?",
-      `Remove all custom roles from ${controller.store.path}? Pi's own defaults will not change.`,
-    ))
-  )
-    return;
-  controller.invalidate();
-  try {
-    await controller.store.reset();
-    await controller.reload(ctx);
-    ctx.ui.notify("Model roles reset.", "info");
-  } catch {
+async function setAutoSelector(
+  controller: RolesController,
+  ctx: ExtensionContext,
+  enabled: boolean,
+): Promise<void> {
+  const snapshot = controller.store.snapshot;
+  if (!snapshot) {
+    if (!enabled) controller.disable(ctx);
     ctx.ui.notify(
-      "Reset failed. Check the configuration file and its lock, then repair it manually.",
-      "warning",
+      enabled
+        ? "Auto Selector cannot be enabled until the role configuration is valid."
+        : "Auto Selector disabled for this session. The current model and effort stay selected.",
+      enabled ? "warning" : "info",
     );
+    return;
   }
+  if (snapshot.config.enabled !== enabled) {
+    const saved = await saveRoleConfig(
+      controller,
+      ctx,
+      { ...snapshot.config, enabled },
+      snapshot.revision,
+    );
+    if (!saved) return;
+  }
+  if (enabled) controller.resume(ctx);
+  else controller.disable(ctx);
+  ctx.ui.notify(
+    enabled
+      ? "Auto Selector enabled. Future eligible prompts may route to another role."
+      : "Auto Selector disabled. The selected role, model, and effort stay in use.",
+    "info",
+  );
 }
 
 export async function showMenu(
   controller: RolesController,
   setup: AutoSetupController,
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
 ): Promise<void> {
   while (controller.active) {
     const snapshot = controller.store.snapshot;
@@ -164,29 +178,14 @@ export async function showMenu(
           description: "description" in role ? role.description : undefined,
         };
       }),
-      routingEnabled: snapshot?.config.enabled ?? false,
-      sessionMode: controller.mode,
-      baseline: `${displayModel(controller.baseline.model)} · ${controller.baseline.effort}`,
-      configPath: controller.store.path,
-      warning: controller.store.error?.message,
+      warning: controller.store.error
+        ? `${controller.store.error.message} (${controller.store.path})`
+        : undefined,
     });
     if (action.type === "close") return;
     if (action.type === "add") await editRole(controller, ctx);
     else if (action.type === "edit") await editRole(controller, ctx, action.id);
     else if (action.type === "delete") await deleteRole(controller, ctx, action.id);
-    else if (action.type === "use") await controller.use(ctx, action.id);
-    else if (action.type === "toggle-session")
-      controller.mode === "manual" ? controller.resume(ctx) : controller.pause(ctx);
-    else if (action.type === "toggle-routing" && snapshot)
-      await saveRoleConfig(
-        controller,
-        ctx,
-        { ...snapshot.config, enabled: !snapshot.config.enabled },
-        snapshot.revision,
-      );
-    else if (action.type === "reload") await controller.reload(ctx);
-    else if (action.type === "reset") await reset(controller, ctx);
-    else if (action.type === "status") showStatus(controller, ctx);
     else if (action.type === "auto-setup") {
       const launched = setup.currentDraft
         ? await reviewAutoSetup(controller, setup, ctx)
@@ -194,39 +193,6 @@ export async function showMenu(
       if (launched) return;
     }
   }
-}
-
-export function showStatus(controller: RolesController, ctx: ExtensionContext): void {
-  const decision = controller.lastDecision;
-  const routing =
-    controller.mode === "auto"
-      ? "Automatic routing is active"
-      : "Routing is paused for this session";
-  if (!decision) {
-    ctx.ui.notify(`${routing}. No task has been routed in this session yet.`, "info");
-    return;
-  }
-  if (decision.status === "selected" || decision.status === "preserved") {
-    const selected = decision.role ? `role “${decision.role}”` : "the default role";
-    const fallback = decision.fallback
-      ? ` Pi used a fallback because ${decision.reason.replaceAll("_", " ")}.`
-      : "";
-    let selector = "";
-    if (decision.selector) {
-      selector = ` Selector: ${displayModel(decision.selector.model)} in ${decision.selector.durationMs} ms.`;
-      if (decision.selector.usage)
-        selector = ` Selector: ${displayModel(decision.selector.model)} in ${decision.selector.durationMs} ms (${decision.selector.usage.totalTokens} tokens).`;
-    }
-    ctx.ui.notify(
-      `${routing}. Last task used ${selected}: ${displayModel(decision.model)} · ${decision.effort}.${fallback}${selector}`,
-      "info",
-    );
-    return;
-  }
-  ctx.ui.notify(
-    `${routing}. The last routing attempt did not change the model (${decision.reason.replaceAll("_", " ")}).`,
-    "info",
-  );
 }
 
 export async function handleCommand(
@@ -243,25 +209,16 @@ export async function handleCommand(
       );
     return;
   }
+  await ctx.waitForIdle();
   const parts = args.trim().split(/\s+/);
   const action = parts[0];
-  if (action === "auto-setup" && parts[1] === "cancel") {
-    setup.cancel(ctx);
-    return;
-  }
-  await ctx.waitForIdle();
-  if (!action || action === "settings") await showMenu(controller, setup, ctx);
-  else if (action === "status") showStatus(controller, ctx);
-  else if (action === "reload") await controller.reload(ctx);
-  else if (action === "pause") controller.pause(ctx);
-  else if (action === "auto") controller.resume(ctx);
-  else if (action === "use" && parts[1]) await controller.use(ctx, parts[1]);
-  else if (action === "auto-setup" && !parts[1]) await startAutoSetup(setup, ctx);
-  else if (action === "auto-setup" && parts[1] === "review")
-    await reviewAutoSetup(controller, setup, ctx);
+  if (!action || (action === "settings" && !parts[1])) await showMenu(controller, setup, ctx);
+  else if (action === "enable" && !parts[1]) await setAutoSelector(controller, ctx, true);
+  else if (action === "disable" && !parts[1]) await setAutoSelector(controller, ctx, false);
+  else if (action === "use" && parts[1] && !parts[2]) await controller.use(ctx, parts[1]);
   else
     ctx.ui.notify(
-      "Use /model-roles [settings|status|reload|pause|auto|use <role>|auto-setup [review|cancel]].",
+      "Use /model-roles settings, /model-roles enable, /model-roles disable, or /model-roles use <role>.",
       "info",
     );
 }

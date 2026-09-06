@@ -17,12 +17,13 @@ The separate [GitHub installation flow](../../README.md#install-from-github) mus
 ## First use and role management
 
 - [ ] First activation exposes `/model-roles` with exactly one inherited `default`; no onboarding, model switch, or selector request occurs.
-- [ ] Dashboard shows default first, the configuration path and resolved inherited model/effort, and plainly distinguishes global automatic-routing enablement from the session-only pause. Default has no Delete/Rename action.
-- [ ] Add, edit, use, and delete a custom role with keyboard only: A/Enter/U/D, arrows or j/k, and Escape. Enter multiline English/non-English and IME-composed text; choose a model and effort explicitly. Review and cost/provider disclosure are understandable.
+- [ ] `/model-roles` completion offers only Settings, the currently relevant Enable/Disable Auto Selector action, and Use entries for configured roles. Removed status/reload/pause/auto/auto-setup command paths show bounded usage guidance.
+- [ ] Settings puts Auto Setup first, then lists roles with CRUD-only controls. Default has no Delete/Rename action; no use, move, selector toggle, global toggle, reload, status, or reset action appears.
+- [ ] Add, edit, and delete a custom role with keyboard only: A/Enter/D, arrows or j/k, and Escape. Enter multiline English/non-English and IME-composed text; choose a model and effort explicitly. Review and cost/provider disclosure are understandable.
 - [ ] With a synthetic catalog spanning three providers and 100+ models, exercise **Add role**, **Edit custom role**, and **Edit default** through `/model-roles settings`. Each model picker shows at most eight rows, a page indicator, and an immediately active search field. Type provider/model fragments, including j/k/H/L and slashes; verify fuzzy results, PgUp/PgDn, arrow wrapping, no matches, Backspace, Ctrl+U, Enter, and Escape/Ctrl+C. Default inheritance stays searchable and exact slash-containing IDs save correctly.
 - [ ] Cancel at identifier, description, model (also with an active query), effort, review, and first-role disclosure. No file/model changes occur.
 - [ ] Edit default to a concrete model, then restore inheritance. Pi's saved defaults remain unchanged.
-- [ ] Use a named role from the menu and `/model-roles use <role>`. It applies without a selector request and pauses automation.
+- [ ] Run `/model-roles use <role>` while Auto Selector is enabled. It applies without a selector request, the footer retains `auto-selector=enabled`, and the next eligible prompt may route elsewhere. Disable Auto Selector, use a different role, and verify that role stays pinned.
 - [ ] Delete the last custom role and return to zero-selector routing. Deletion does not change the active model.
 
 ## Readability and keyboard access
@@ -34,10 +35,10 @@ The separate [GitHub installation flow](../../README.md#install-from-github) mus
 
 - [ ] In a disposable primary TUI session, open **Auto Setup**, choose one to eight cached models with Space/Tab, arrows, and Enter; verify the ninth selection is refused. Type directly to fuzzy-search and use PgUp/PgDn to change pages. Selections persist across searches/pages; clearing the query and unchecking a hidden selection works. Escape/Ctrl+C cancel immediately, including with an active query, without an Auto Setup request or role-file change. Try long/non-English model IDs at 40, 80, and 120 columns in light and dark themes.
 - [ ] Read the start disclosure. Verify it names the current model, distinguishes normal model/tool data flow and possible charges from future selector charges, says tools are not sandboxed, and explains the offline/no-evidence fallback.
-- [ ] With an approved synthetic or fake search setup, verify a proposal remains unavailable until the normal agent settles, then review source status/URLs/dates/caveats, unresolved identity, offline/no-evidence, and a report that recommends no configuration change. For role recommendations, verify descriptions use task-observable boundaries, contain no execution/model claims, and do not clearly overlap; use Discuss/refine to test that the same rubric is retained. Do not mark live-provider behavior passed without separate approval.
+- [ ] With an approved synthetic or fake search setup, verify a proposal remains unavailable until the normal agent settles, then the review opens automatically without another command. Verify source status/URLs/dates/caveats, unresolved identity, offline/no-evidence, and a report that recommends no configuration change. For role recommendations, verify each description begins with “Use when”, uses an observable trigger and near-miss boundary, contains no execution/model claims, and does not overlap; use Discuss/refine to test that the same rubric and automatic review are retained. Do not mark live-provider behavior passed without separate approval.
 - [ ] With synthetic data on Pi 0.85.1, submit valid array caveats and scalar-string caveats in separate setup passes; verify the latter is converted to an array and both produce a settled review draft without saving role YAML. Submit an over-limit caveat array, then correct it with the same request ID/generation; verify the error identifies the field and the corrected report becomes ready. Check that research/refinement instruct only one correction attempt and no retry after acceptance or cancellation.
 - [ ] Use **Discuss/refine** with keyboard and IME-composed text. Verify it creates a new explicit setup exchange, ordinary chat is not silently captured, and the model/effort do not change during guarded research/refinement.
-- [ ] Cancel while a setup turn has active tools. Verify the command returns promptly, proposal authority is revoked, no role YAML changes, and the UI explains when Escape is needed for remaining normal-agent work.
+- [ ] Press Escape while a setup turn has active tools. Verify the normal agent stops cooperatively and no role YAML changes. After a settled proposal, choose **Cancel proposal** in the automatic review and verify the draft is discarded.
 - [ ] Review a proposal against existing roles. Verify keep/add, individual replacements, changed-default choice, and destructive replace-custom-roles confirmation show the exact diff. Decline each confirmation, including first-custom-role routing disclosure, and verify YAML remains unchanged.
 - [ ] Confirm an additive proposal while an unrelated saved role is unavailable; the unchanged role remains with its warning. Change YAML in another session before final confirmation and verify Auto Setup requires a fresh review rather than forcing a save.
 - [ ] Reload/navigate after a settled draft and verify it is review-only. Exercise a malformed/cancelled/applied marker with synthetic session data when supported; no historical draft should silently become actionable.
@@ -47,16 +48,15 @@ The separate [GitHub installation flow](../../README.md#install-from-github) mus
 - [ ] Submit an idle task with eligible custom roles. The selector runs once on default and execution uses the selected role. Tools and queued follow-ups retain that model.
 - [ ] Check no-match and overlapping descriptions. Default fallback is visible rather than silently choosing the first custom role.
 - [ ] Press Escape during the selector loader. Execution is cancelled and task text is restored. Verify the image reattachment warning with a synthetic attachment.
-- [ ] Change model/effort manually. Routing pauses; `/model-roles auto` resumes on the next eligible prompt without sending a request immediately. Reload preserves manual authority.
-- [ ] Disable global routing and confirm the current pair stays unchanged. `/model-roles auto` alone does not override the global disable; enabling and resuming restores routing.
-- [ ] Open Status. Check reason, requested/effective effort, fallback, and separate selector usage when available. No task text, role description, or raw provider response appears there.
+- [ ] Change model/effort manually. The footer shows `auto-selector=disabled`; `/model-roles enable` resumes on the next eligible prompt without sending a request immediately. Reload preserves manual authority.
+- [ ] Run `/model-roles disable` and confirm the selected/current role, model, and effort stay unchanged across ordinary prompts. The footer visibly shows `auto-selector=disabled`; `/model-roles enable` restores routing.
 
 ## Recovery and removal
 
 - [ ] Exercise unavailable-model warnings and malformed YAML retention. A failed reload retains the last valid settings with a warning; a cold invalid load preserves the current Pi model and allows repair.
 - [ ] Make a conflicting external edit and test an abandoned lock in the disposable directory. Saves do not force overwrites, and recovery guidance is bounded. Remove a lock only after verifying no writer is active.
 - [ ] Change a role in one session, then reload another. Saved changes become visible without assuming a background watcher.
-- [ ] Confirm Reset affects only package YAML and warns that custom roles will be lost. Cancelling Reset leaves it intact.
+- [ ] Back up and manually reset package YAML, run Pi's `/reload`, and verify Pi defaults remain unchanged. Settings itself offers no reset operation.
 - [ ] Disable/remove the package and restart. Ordinary Pi behavior returns, while role YAML remains available for reinstall.
 
 ## Record results

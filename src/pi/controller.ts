@@ -79,7 +79,7 @@ export class RolesController {
     }
     if (this.store.error)
       ctx.ui.notify(
-        `Model roles: ${this.store.error.message}. Use /model-roles to repair.`,
+        `Model roles: ${this.store.error.message}. Repair ${this.store.path}, then run Pi's /reload command.`,
         "warning",
       );
     this.status(ctx);
@@ -115,12 +115,16 @@ export class RolesController {
     });
     this.status(ctx);
   }
+  get autoSelectorEnabled(): boolean {
+    return this.mode === "auto" && Boolean(this.store.snapshot?.config.enabled);
+  }
   status(ctx: ExtensionContext): void {
     if (!this.active) return;
     const actual = currentState(ctx);
+    const selector = this.autoSelectorEnabled ? "enabled" : "disabled";
     ctx.ui.setStatus(
       "model-roles",
-      `roles:${this.mode === "manual" ? `paused${this.role ? `/${this.role}` : ""}` : this.store.snapshot?.config.enabled ? (this.role ?? "auto") : "disabled"} ${displayModel(actual.model)}:${actual.effort}${this.lastDecision?.fallback ? ` [fallback:${this.lastDecision.reason}]` : ""}${this.store.error ? " [config warning]" : ""}`,
+      `roles:auto-selector=${selector}${this.role ? ` role=${this.role}` : ""} ${displayModel(actual.model)}:${actual.effort}${this.lastDecision?.fallback ? ` [fallback:${this.lastDecision.reason}]` : ""}${this.store.error ? " [config warning]" : ""}`,
     );
   }
   private record(ctx: ExtensionContext, decision: SelectionDecision): void {
@@ -134,6 +138,12 @@ export class RolesController {
     this.invalidate();
     this.mode = "manual";
     this.role = undefined;
+    this.pinned = currentState(ctx);
+    this.persist(ctx);
+  }
+  disable(ctx: ExtensionContext): void {
+    this.invalidate();
+    this.mode = "manual";
     this.pinned = currentState(ctx);
     this.persist(ctx);
   }
@@ -349,13 +359,17 @@ export class RolesController {
       ctx.ui.notify("Model roles: requested role is unavailable.", "warning");
       return;
     }
+    const previous = currentState(ctx);
     const result = await this.apply(ctx, decision, request, token);
-    if (result.status !== "selected") {
-      ctx.ui.notify("Model roles: role could not be applied.", "warning");
+    if (result.status !== "selected" || result.role !== role || result.fallback) {
+      await this.setPair(ctx, previous, () => token === this.generation);
+      ctx.ui.notify(
+        "Model roles: role could not be applied; the previous selection was restored.",
+        "warning",
+      );
       return;
     }
-    this.mode = "manual";
-    this.pinned = currentState(ctx);
+    if (this.mode === "manual") this.pinned = currentState(ctx);
     this.record(ctx, result);
   }
 }

@@ -29,7 +29,7 @@ test("real SDK uses the selected smaller context model before pre-prompt compact
     const snap = await store.load();
     assert.ok(snap);
     await store.save(config(), snap.revision);
-    await h.session.prompt("/model-roles reload");
+    await h.session.reload();
     h.session.setAutoCompactionEnabled(true);
     const previous = h.session.messages.filter((message) => message.role === "assistant").at(-1);
     assert.ok(previous?.role === "assistant" && previous.usage.totalTokens > 100000);
@@ -70,7 +70,7 @@ test("real SDK queued follow-up remains on the active role without another selec
     const snap = await store.load();
     assert.ok(snap);
     await store.save(config(), snap.revision);
-    await h.session.prompt("/model-roles reload");
+    await h.session.reload();
     h.respond(
       fauxAssistantMessage('{"matches":["fast"]}'),
       async (_context, _options, _state, model) => {

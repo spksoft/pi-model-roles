@@ -2,22 +2,21 @@
 
 [← README](../README.md) · [Compatibility and troubleshooting](compatibility.md) · [Integration API](api.md)
 
-For most users, **`/model-roles` is the only configuration tool needed**. Use its dialogs to add roles, choose models and thinking effort, and control automatic routing. You do not need to write YAML or look up provider IDs by hand.
+For most users, **`/model-roles settings`** is the only configuration UI needed. Use it for Auto Setup and role CRUD; use `/model-roles enable`, `/model-roles disable`, and `/model-roles use <role>` for runtime selection. You do not need to write YAML or look up provider IDs by hand.
 
 ## Manage roles in Pi
 
-| Goal | Steps in `/model-roles` |
+| Goal | Action |
 | --- | --- |
-| Add a role | Press **A** → identifier → when-to-use description → model → effort → review and save. |
-| Change a role | Select the role with arrows (or `j`/`k`) → **Enter**. Review all fields before saving. |
-| Change the default | Select `default` → **Enter**. Choose a model and effort, or restore **Use Pi default model** and `inherit`. |
-| Choose a role yourself | Select the role → **U**, or run `/model-roles use <role>`. This pauses automation. |
-| Remove a custom role | Select the role → **D** → confirm. This does not change the active execution model. |
-| Stop automation temporarily | Press **P**, or run `/model-roles pause`. Resume with `/model-roles auto`. |
-| Stop automation across sessions | Press **G**. This saves `enabled: false`; existing sessions must reload to see it. |
-| Start over | Press **X** → confirm. This removes custom roles and restores the inherited default configuration. |
+| Start Auto Setup | Select the first **Auto Setup** item in `/model-roles settings`. |
+| Add a role | In Settings, press **A** → identifier → task-observable “Use when …” description → model → effort → review and save. |
+| Read roles | Settings lists every role, assignment, effort, description, and availability warning. |
+| Change a role/default | Select it with arrows (or `j`/`k`) → **Enter**. Review all fields before saving. |
+| Remove a custom role | Select it → **D** → confirm. This does not change the active execution model. |
+| Choose a role yourself | Run `/model-roles use <role>`. Auto Selector keeps its current state. |
+| Stay on the selected role | Run `/model-roles disable`; re-enable future routing with `/model-roles enable`. |
 
-The dashboard labels session pause and global enablement separately, so a session-only pause is not confused with the saved global setting. The default role cannot be deleted or renamed. Role edits remain drafts until confirmed, and cancelling leaves the model and file unchanged. Saving a role does not immediately switch the execution model; **U** does.
+Settings intentionally exposes only Auto Setup plus create/read/update/delete role actions—no use, move, pause, global toggle, reload, status, or reset operations. The default role cannot be deleted or renamed. Role edits remain drafts until confirmed, and cancelling leaves the model and file unchanged. Saving a role does not immediately switch the execution model.
 
 ### Model picker controls
 
@@ -35,10 +34,10 @@ The picker uses cached available models within Pi's current scope. It does not r
 
 Auto Setup is a primary-TUI workflow for researching **one to eight** cached available models and proposing ordinary role changes. It has no YAML settings and does not configure providers, credentials, search services, or Pi's tool permissions.
 
-1. Run `/model-roles auto-setup` or select **Auto Setup** in the menu, then choose models with Space or Tab and continue with Enter. Use the shared [model picker controls](#model-picker-controls) to search and navigate pages. Escape cancels immediately.
+1. Open `/model-roles settings`, select the top **Auto Setup** item, then choose models with Space or Tab and continue with Enter. Use the shared [model picker controls](#model-picker-controls) to search and navigate pages. Escape cancels immediately.
 2. Read and confirm the disclosure. Research uses the **current Pi model** without switching it. The model receives its normal Pi conversation/provider flow and may use the tools you already configured. Tool providers can make requests, charge, or retain data under their own policies. Auto Setup does not sandbox them.
 3. The normal agent should research first-party material for every exact selected provider/model ID and submit a structured report. The prompt asks it to recommend the smallest useful role set, write criteria decidable from the submitted task alone, avoid execution instructions and model claims in descriptions, and check every pair for overlap. Good/bad few-shot descriptions demonstrate these boundaries. It may instead report that no official evidence was found, that it used offline knowledge, or that a serving-model identity could not be resolved. A source URL is agent-reported and user-reviewable, not independently verified by this package. Offline knowledge means no web evidence was collected; it is not a local model run.
-4. When Pi reports the proposal settled, run `/model-roles auto-setup review`. Inspect per-model evidence state, dates, benchmark conditions/caveats, recommendations and the exact role diff. **Discuss/refine** sends a new guarded normal-agent message. Ordinary chat is not captured as Auto Setup discussion.
+4. When research or refinement settles, Auto Setup opens its review automatically. No second command is required. Inspect per-model evidence state, dates, benchmark conditions/caveats, recommendations and the exact role diff. **Discuss/refine** sends a new guarded normal-agent message. If the session becomes busy before the deferred review opens, reopen the draft from the top of Settings. Ordinary chat is not captured as Auto Setup discussion.
 5. Choose whether to keep conflicts, replace individual conflicting roles, or replace all custom roles after a destructive confirmation. Confirm the final diff. Research and discussion alone never write `config.yaml`.
 
 Auto Setup preserves `enabled`, `selectorTimeoutMs`, untouched roles, the session's routing mode, and the current model/effort. An unchanged unavailable role does not prevent an otherwise valid proposed addition; a model/effort newly added or changed must still be cached as available and supported at save time. A suggested default replacement is separate and never implicit. Adding the first custom role also shows the normal future-selector cost/provider disclosure; research consent does not grant that permission.
@@ -49,9 +48,9 @@ Validation rejections identify the failing field. Research and refinement instru
 
 The proposal is bounded to eight models, three source records per model (24 total), 31 custom suggestions, 2,048-character URLs, 1,500-character assessments, 1,000-character role rationales, 500-character effort rationales/caveats, 64 KiB tool/session payloads, and 32 KiB generated prompts. Inputs beyond these bounds are rejected, never silently truncated. The package stores only bounded report/draft state in Pi custom session entries, not live request tokens, credentials, raw fetched pages, or deliberately copied conversation text. Bounded generated report text can still contain unwanted material; do not treat this as a secret-detection guarantee.
 
-`/model-roles auto-setup cancel` revokes pending proposal authority before waiting for Pi to become idle. It aborts only a research turn it can identify as its own; otherwise press Escape to stop the ordinary agent. It cannot reverse completed requests, charges, or tool effects. A valid restored proposal is review-only. A malformed, unknown-version, cancelled, or applied latest Auto Setup session marker is non-actionable and never revives an older draft. If configuration changes after research, reload/check it and review a new exact diff before saving. If configuration saves but its session applied marker cannot be recorded, the role file is already saved; the package reports a warning and does not retry.
+Press Escape to stop an active research turn. After a proposal settles, **Cancel proposal** in the automatic review discards it. Cancellation cannot reverse completed requests, charges, or tool effects. A valid restored proposal is review-only. A malformed, unknown-version, cancelled, or applied latest Auto Setup session marker is non-actionable and never revives an older draft. If configuration changes after research, reload/check it and review a new exact diff before saving. If configuration saves but its session applied marker cannot be recorded, the role file is already saved; the package reports a warning and does not retry.
 
-Pausing is session-specific; disabling is a saved global setting. `/model-roles auto` clears the session pause but does not override `enabled: false`. Enable global routing in the menu as well if needed. Neither action sends a selector request immediately.
+`/model-roles disable` saves `enabled: false` and pins this session's selected/current role, model, and effort. `/model-roles enable` saves `enabled: true`, clears this session's manual pause, and permits routing on the next eligible prompt; it sends no selector request immediately. A direct `/model-roles use <role>` preserves whichever state is active.
 
 ## Write useful role descriptions
 
@@ -74,7 +73,7 @@ There is one user-wide file:
 ~/.pi/agent/extensions/pi-model-roles/config.yaml
 ```
 
-The exact path is `join(getAgentDir(), 'extensions', 'pi-model-roles', 'config.yaml')`. If you set `PI_CODING_AGENT_DIR`, it replaces `~/.pi/agent`. The menu and `/model-roles status` show the resolved path.
+The exact path is `join(getAgentDir(), 'extensions', 'pi-model-roles', 'config.yaml')`. If you set `PI_CODING_AGENT_DIR`, it replaces `~/.pi/agent`. Settings includes this path when it reports an invalid configuration.
 
 - Roles are shared across projects, even when the package is installed with Pi's `-l` option.
 - There are no project role overrides, environment-based role definitions, or background file watchers.
@@ -85,7 +84,7 @@ Only a missing file is automatically created, and only in a primary interactive 
 
 ## Edit YAML manually
 
-Edit the file at the path above, then run `/model-roles reload`. Pi's `/reload` also reloads it. Successful menu saves take effect in that session immediately; other open sessions need a reload.
+Edit the file at the path above, then run Pi's `/reload`. Successful Settings saves take effect in that session immediately; other open sessions need `/reload`.
 
 This is the initial configuration:
 
@@ -163,17 +162,17 @@ Normal fallback is **configured default → inherited Pi baseline → current pe
 
 | Problem | What to do |
 | --- | --- |
-| Automatic selection is not running | Check `/model-roles status`. Clear a session pause with `/model-roles auto`, and enable global routing in the menu if disabled. Default-only configuration intentionally makes no selector request. |
+| Automatic selection is not running | Check the footer for `auto-selector=disabled`, then run `/model-roles enable`. Default-only configuration intentionally makes no selector request. |
 | A model is marked unavailable | Configure/authenticate its provider in Pi, choose another role model, or restore default inheritance. Refresh model availability using Pi's normal controls. Role reload alone does not probe providers. |
-| YAML is invalid | Correct the reported field/location, then reload. Or back up the file and use **Reset configuration** to discard custom roles. |
-| An external edit does not appear | Run `/model-roles reload` in each affected session. There is no file watcher. |
+| YAML is invalid | Settings reports the file path. Correct the reported field/location manually, then run Pi's `/reload`. Settings does not overwrite or reset invalid data. |
+| An external edit does not appear | Run Pi's `/reload` in each affected session. There is no file watcher. |
 | A save reports a conflict or busy file | Reload and reapply the draft. Do not force an overwrite. Another session may have saved first. |
 | `config.yaml.lock` remains after a crash | First verify that no Pi process is writing this configuration. Only then remove that lock directory. Locks are never automatically stolen. |
 | Reset or save still fails | Check file permissions and path type. Symlinks, nonregular files, and oversized files may require manual repair before the menu can save. |
 
 On a failed reload, the session retains its last valid in-memory configuration and shows a warning; the invalid file is left intact. If the first load is invalid, Pi keeps its current model and the repair menu remains available.
 
-Reset replaces only this package's YAML, after confirmation. To stop using the package without losing roles, pause/disable it or follow the [removal instructions](../README.md#update-or-remove).
+To stop using the package without losing roles, run `/model-roles disable` or follow the [removal instructions](../README.md#update-or-remove).
 
 ## Advanced limits and safeguards
 

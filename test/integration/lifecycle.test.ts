@@ -18,7 +18,7 @@ test("real SDK: default-only startup, routing before execution, manual pause, re
     await h.session.prompt("One role task");
     assert.equal(h.faux.state.callCount, 1);
     await store.save(config(), initial.revision);
-    await h.session.prompt("/model-roles reload");
+    await h.session.reload();
     h.respond(
       (_context, _options, _state, model) => {
         assert.equal(model.id, "default");
@@ -44,7 +44,7 @@ test("real SDK: default-only startup, routing before execution, manual pause, re
     h.respond(fauxAssistantMessage("manual"));
     await h.session.prompt("Manual pinned task");
     assert.equal(h.faux.state.callCount, 4);
-    await h.session.prompt("/model-roles auto");
+    await h.session.prompt("/model-roles enable");
     h.respond(fauxAssistantMessage('{"matches":[]}'), (_context, _options, _state, model) => {
       assert.equal(model.id, "default");
       return fauxAssistantMessage("fallback");
@@ -85,7 +85,7 @@ test("real SDK: loader cancellation prevents task execution and restores text", 
     const snap = await store.load();
     assert.ok(snap);
     await store.save(config(), snap.revision);
-    await h.session.prompt("/model-roles reload");
+    await h.session.reload();
     h.ui.cancelSelection();
     h.respond(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -107,7 +107,7 @@ test("invalid configuration remains intact and does not block the current Pi mod
   try {
     const store = new ConfigStore(h.dir);
     await writeFile(store.path, "version: 999\n");
-    await h.session.prompt("/model-roles reload");
+    await h.session.reload();
     h.respond(fauxAssistantMessage("still usable"));
     await h.session.prompt("Task");
     assert.equal(await readFile(store.path, "utf8"), "version: 999\n");

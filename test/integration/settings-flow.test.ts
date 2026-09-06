@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
-import { fauxProvider } from "@earendil-works/pi-ai";
+import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { ConfigStore } from "../../src/config/store.js";
 import { sdkHarness } from "../support/sdk.js";
 
@@ -13,6 +13,23 @@ const draft = [
   true,
   true,
 ] as const;
+test("removed model-roles subcommands show the bounded command surface", async () => {
+  const h = await sdkHarness();
+  try {
+    for (const command of ["status", "reload", "pause", "auto", "auto-setup"]) {
+      await h.session.prompt(`/model-roles ${command}`);
+    }
+    assert.equal(h.faux.state.callCount, 0);
+    assert.equal(
+      h.ui.notifications.filter((message) => message.includes("/model-roles settings")).length,
+      5,
+    );
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.close();
+  }
+});
+
 test("native menu: cancelling every add step leaves configuration and model untouched", async () => {
   const h = await sdkHarness();
   try {
@@ -35,7 +52,7 @@ test("native menu: cancelling every add step leaves configuration and model unto
   }
 });
 
-test("native menu: create, edit, use, resume, delete, override default and reset", async () => {
+test("native menu: create, edit, delete, override default, and command-level role use", async () => {
   const h = await sdkHarness();
   try {
     const store = new ConfigStore(h.dir);
@@ -61,9 +78,11 @@ test("native menu: create, edit, use, resume, delete, override default and reset
     await h.session.prompt("/model-roles use fast");
     assert.equal(h.session.model?.id, "owner/fast");
     assert.equal(h.session.thinkingLevel, "medium");
-    assert.match(h.ui.statuses.get("model-roles") ?? "", /paused/);
-    await h.session.prompt("/model-roles auto");
-    assert.doesNotMatch(h.ui.statuses.get("model-roles") ?? "", /paused/);
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=enabled role=fast/);
+    await h.session.prompt("/model-roles disable");
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=disabled role=fast/);
+    await h.session.prompt("/model-roles enable");
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=enabled/);
     const changed = snap.config.roles.fast;
     assert.ok(changed);
     h.ui.customAnswers.push({ type: "delete", id: "fast" }, { type: "close" });
@@ -82,18 +101,50 @@ test("native menu: create, edit, use, resume, delete, override default and reset
     snap = await store.load();
     assert.ok(snap);
     assert.equal(snap.config.roles.default.effort, "high");
-    h.ui.customAnswers.push({ type: "reset" }, { type: "close" });
-    h.ui.answers.push(true);
-    await h.session.prompt("/model-roles");
     assert.equal(
       h.ui.selections.some((row) => row.title === "Role: default"),
       false,
     );
-    snap = await store.load();
-    assert.ok(snap);
-    assert.deepEqual(snap.config.roles.default, { model: "inherit", effort: "inherit" });
     await assert.rejects(readFile(`${h.dir}/settings.json`), { code: "ENOENT" });
     assert.equal(h.faux.state.callCount, 0);
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.close();
+  }
+});
+
+test("using a role preserves Auto Selector state and disabling pins that role", async () => {
+  const h = await sdkHarness();
+  try {
+    const store = new ConfigStore(h.dir);
+    const snapshot = await store.load();
+    assert.ok(snapshot);
+    const configured = structuredClone(snapshot.config);
+    configured.roles.fast = {
+      model: { provider: "fixture", id: "owner/fast" },
+      effort: "low",
+      description: "Use when the task is a small, explicit change with no design work.",
+    };
+    await store.save(configured, snapshot.revision);
+    await h.session.reload();
+
+    await h.session.prompt("/model-roles use fast");
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=enabled role=fast/);
+    h.respond(
+      fauxAssistantMessage('{"matches":[]}'),
+      fauxAssistantMessage("Default role handled the next task."),
+    );
+    await h.session.prompt("A task that does not match the fast role");
+    assert.equal(h.session.model?.id, "default");
+    assert.equal(h.faux.state.callCount, 2);
+
+    await h.session.prompt("/model-roles use fast");
+    await h.session.prompt("/model-roles disable");
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=disabled role=fast/);
+    h.respond(fauxAssistantMessage("Pinned role handled the task."));
+    await h.session.prompt("Another task while disabled");
+    assert.equal(h.session.model?.id, "owner/fast");
+    assert.equal(h.faux.state.callCount, 3);
     assert.deepEqual(h.errors, []);
   } finally {
     await h.close();

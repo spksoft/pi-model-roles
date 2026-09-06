@@ -8,25 +8,11 @@ export interface DashboardRole {
 }
 
 export type DashboardAction =
-  | {
-      type:
-        | "add"
-        | "auto-setup"
-        | "toggle-routing"
-        | "toggle-session"
-        | "reload"
-        | "reset"
-        | "status"
-        | "close";
-    }
-  | { type: "edit" | "delete" | "use"; id: string };
+  | { type: "add" | "auto-setup" | "close" }
+  | { type: "edit" | "delete"; id: string };
 
 export interface RoleDashboardOptions {
   roles: readonly DashboardRole[];
-  routingEnabled: boolean;
-  sessionMode: "auto" | "manual";
-  baseline: string;
-  configPath: string;
   warning?: string;
 }
 
@@ -43,28 +29,25 @@ export class RoleDashboard implements Component {
   render(width: number): string[] {
     const truncate = (value: string) =>
       value.length > width - 4 ? `${value.slice(0, Math.max(1, width - 5))}…` : value;
-    const selected = this.options.roles[this.cursor];
-    const routing = this.options.routingEnabled ? "on" : "off";
-    const session = this.options.sessionMode === "auto" ? "automatic" : "paused";
+    const autoSetupSelected = this.cursor === 0;
+    const selected = this.options.roles[this.cursor - 1];
     const rows = this.options.roles.flatMap((role, index) => {
-      const current = index === this.cursor;
+      const current = index + 1 === this.cursor;
       const row = truncate(`${current ? "> " : "  "}${role.summary}`);
       const styled = current ? this.theme.fg("accent", row) : row;
       return role.description ? [styled, `    ${truncate(role.description)}`] : [styled];
     });
+    const autoSetup = `${autoSetupSelected ? "> " : "  "}Auto Setup — research role recommendations`;
     return [
-      this.theme.bold("Model Roles"),
-      `Routing: ${routing} · This session: ${session}`,
-      `Default: ${truncate(this.options.baseline)}`,
-      "↑/↓ or j/k move · Enter edit · A add · U use · D delete",
-      "P session pause/resume · G global on/off · S Auto Setup",
-      "R reload · X reset · I status · Esc close",
-      this.options.warning ? `Warning: ${this.options.warning}` : "",
+      this.theme.bold("Model Role Settings"),
+      autoSetupSelected ? this.theme.fg("accent", truncate(autoSetup)) : truncate(autoSetup),
       "",
+      "Roles",
       ...rows,
       selected?.id === "default" ? "Default role cannot be deleted." : "",
       "",
-      `Config: ${this.options.configPath}`,
+      "↑/↓ or j/k move · Enter open/edit · A add · D delete · Esc close",
+      this.options.warning ? `Warning: ${this.options.warning}` : "",
     ];
   }
 
@@ -76,27 +59,18 @@ export class RoleDashboard implements Component {
       return this.tui.requestRender();
     }
     if (data === "\u001b[B" || data === "j") {
-      this.cursor = Math.min(this.options.roles.length - 1, this.cursor + 1);
+      this.cursor = Math.min(this.options.roles.length, this.cursor + 1);
       return this.tui.requestRender();
     }
-    const actions: Record<string, DashboardAction> = {
-      "\u001b": { type: "close" },
-      q: { type: "close" },
-      a: { type: "add" },
-      p: { type: "toggle-session" },
-      g: { type: "toggle-routing" },
-      s: { type: "auto-setup" },
-      r: { type: "reload" },
-      x: { type: "reset" },
-      i: { type: "status" },
-    };
-    const action = actions[data];
-    if (action) return this.done(action);
-    const selected = this.options.roles[this.cursor];
-    if (!selected) return;
-    if (data === "\r" || data === "\n") return this.done({ type: "edit", id: selected.id });
-    if (data === "u") return this.done({ type: "use", id: selected.id });
-    if (data === "d" && selected.id !== "default") this.done({ type: "delete", id: selected.id });
+    if (data === "\u001b" || data === "q") return this.done({ type: "close" });
+    if (data === "a") return this.done({ type: "add" });
+    const selected = this.options.roles[this.cursor - 1];
+    if (data === "\r" || data === "\n") {
+      if (this.cursor === 0) return this.done({ type: "auto-setup" });
+      if (selected) return this.done({ type: "edit", id: selected.id });
+    }
+    if (data === "d" && selected && selected.id !== "default")
+      this.done({ type: "delete", id: selected.id });
   }
 }
 

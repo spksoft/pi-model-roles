@@ -5,7 +5,23 @@ import { RolesController } from "./pi/controller.js";
 import { AutoSetupController } from "./pi/auto-setup-controller.js";
 import { registerAutoSetupTool } from "./auto-setup/tool.js";
 import { hasStartupChoice } from "./pi/startup-choice.js";
+import { reviewAutoSetup } from "./ui/auto-setup.js";
 import { handleCommand } from "./ui/menu.js";
+
+export function modelRoleCommandCompletions(
+  autoSelectorEnabled: boolean,
+  roleIds: readonly string[],
+  prefix: string,
+): Array<{ value: string; label: string }> {
+  return [
+    { value: "settings", label: "Settings" },
+    autoSelectorEnabled
+      ? { value: "disable", label: "Disable Auto Selector" }
+      : { value: "enable", label: "Enable Auto Selector" },
+    ...roleIds.map((id) => ({ value: `use ${id}`, label: `Use ${id}` })),
+  ].filter((item) => item.value.startsWith(prefix));
+}
+
 export default function modelRoles(pi: ExtensionAPI): void {
   // Capture at factory time: some SDK child hosts temporarily change process.env while loading.
   const child = process.env.PI_SUBAGENT_CHILD === "1" || process.env.PI_SUBAGENT_CHILD === "true";
@@ -19,23 +35,16 @@ export default function modelRoles(pi: ExtensionAPI): void {
   );
   const autoSetup = new AutoSetupController(pi, controller.store, () => controller.active);
   let autoSetupToolRegistered = false;
+  let autoReviewTimer: ReturnType<typeof setTimeout> | undefined;
   let disposeService: (() => void) | undefined;
   pi.registerCommand("model-roles", {
     description: "Manage task-routing roles",
     getArgumentCompletions: (prefix) =>
-      [
-        "settings",
-        "status",
-        "reload",
-        "pause",
-        "auto",
-        "auto-setup",
-        "auto-setup review",
-        "auto-setup cancel",
-        ...Object.keys(controller.store.snapshot?.config.roles ?? {}).map((id) => `use ${id}`),
-      ]
-        .filter((value) => value.startsWith(prefix))
-        .map((value) => ({ value, label: value })),
+      modelRoleCommandCompletions(
+        controller.autoSelectorEnabled,
+        Object.keys(controller.store.snapshot?.config.roles ?? {}),
+        prefix,
+      ),
     handler: (args, ctx) => handleCommand(controller, autoSetup, args, ctx),
   });
   pi.on("session_start", async (event, ctx) => {
@@ -66,12 +75,33 @@ export default function modelRoles(pi: ExtensionAPI): void {
     controller.externalChange(ctx, "effort");
   });
   pi.on("agent_start", (_event, ctx) => autoSetup.agentStarted(ctx));
-  pi.on("agent_settled", (_event, ctx) => autoSetup.agentSettled(ctx));
+  pi.on("agent_settled", (_event, ctx) => {
+    const requestId = autoSetup.agentSettled(ctx);
+    if (!requestId) return;
+    if (autoReviewTimer) clearTimeout(autoReviewTimer);
+    autoReviewTimer = setTimeout(() => {
+      autoReviewTimer = undefined;
+      if (!autoSetup.claimAutomaticReview(ctx, requestId)) {
+        if (controller.active)
+          ctx.ui.notify("Auto Setup review remains available at the top of Settings.", "info");
+        return;
+      }
+      void reviewAutoSetup(controller, autoSetup, ctx).catch(() => {
+        if (controller.active)
+          ctx.ui.notify(
+            "Auto Setup could not open its review. Open Settings to try again.",
+            "warning",
+          );
+      });
+    }, 0);
+  });
   pi.on("session_tree", (_event, ctx) => {
     controller.tree(ctx);
     autoSetup.tree(ctx);
   });
   pi.on("session_shutdown", (_event, ctx) => {
+    if (autoReviewTimer) clearTimeout(autoReviewTimer);
+    autoReviewTimer = undefined;
     disposeService?.();
     disposeService = undefined;
     autoSetup.shutdown();

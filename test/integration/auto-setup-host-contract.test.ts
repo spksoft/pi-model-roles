@@ -61,7 +61,7 @@ for (const scalarCaveats of [false, true]) {
         h.session.getAllTools().find((tool) => tool.name === AUTO_SETUP_TOOL)?.parameters,
         autoSetupSubmissionSchema,
       );
-      h.ui.customAnswers.push([defaultModel, fastModel]);
+      h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel]);
       h.ui.answers.push(true);
       let generation = 0;
       let requestId = "";
@@ -94,8 +94,9 @@ for (const scalarCaveats of [false, true]) {
         },
         fauxAssistantMessage([fauxText("Structured proposal submitted.")]),
       );
-      await h.session.prompt("/model-roles auto-setup");
+      await h.session.prompt("/model-roles settings");
       await h.session.waitForIdle();
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
       assert.ok(requestId);
       assert.equal(h.session.model?.id, "default");
       assert.equal(h.session.thinkingLevel, "high");
@@ -135,7 +136,7 @@ for (const [name, caveats, rejection] of [
     try {
       const store = new ConfigStore(h.dir);
       const before = await store.load(false);
-      h.ui.customAnswers.push([defaultModel, fastModel]);
+      h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel]);
       h.ui.answers.push(true);
       let requestId = "";
       let generation = 0;
@@ -182,8 +183,9 @@ for (const [name, caveats, rejection] of [
         },
         fauxAssistantMessage([fauxText("Corrected proposal submitted.")]),
       );
-      await h.session.prompt("/model-roles auto-setup");
+      await h.session.prompt("/model-roles settings");
       await h.session.waitForIdle();
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
       assert.equal(h.faux.state.callCount, 3, JSON.stringify(h.session.messages));
       assert.equal(h.errors.length, 0);
       assert.ok(h.ui.notifications.some((message) => message.includes("proposal is ready")));

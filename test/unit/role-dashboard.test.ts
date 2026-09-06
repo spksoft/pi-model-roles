@@ -16,10 +16,6 @@ function dashboard(done: (action: DashboardAction) => void) {
         { id: "default", summary: "default · Pi default · inherit" },
         { id: "quick", summary: "quick · fixture/fast · low", description: "Small edits." },
       ],
-      routingEnabled: true,
-      sessionMode: "manual",
-      baseline: "fixture/default · off",
-      configPath: "/tmp/config.yaml",
     },
     { requestRender() {} } as unknown as TUI,
     theme,
@@ -27,33 +23,36 @@ function dashboard(done: (action: DashboardAction) => void) {
   );
 }
 
-test("role dashboard presents plain-language routing state and direct actions", () => {
+test("role settings put Auto Setup first and expose only CRUD actions", () => {
   const actions: unknown[] = [];
   const component = dashboard((action) => actions.push(action));
   const text = component.render(100).join("\n");
-  assert.match(text, /Routing: on · This session: paused/);
-  assert.match(text, /Enter edit · A add · U use · D delete/);
+  assert.ok(text.indexOf("Auto Setup") < text.indexOf("Roles\n"));
+  assert.match(text, /Enter open\/edit · A add · D delete/);
+  assert.doesNotMatch(text, /use|pause|global|reload|reset|status/i);
+  component.handleInput("\r");
   component.handleInput("a");
-  assert.deepEqual(actions, [{ type: "add" }]);
+  assert.deepEqual(actions, [{ type: "auto-setup" }, { type: "add" }]);
 });
 
-test("role dashboard edits, uses, and deletes a custom role without a submenu", () => {
+test("role settings edit and delete a custom role without unrelated operations", () => {
   const actions: unknown[] = [];
   const component = dashboard((action) => actions.push(action));
+  component.handleInput("j");
   component.handleInput("j");
   component.handleInput("\r");
   component.handleInput("u");
   component.handleInput("d");
   assert.deepEqual(actions, [
     { type: "edit", id: "quick" },
-    { type: "use", id: "quick" },
     { type: "delete", id: "quick" },
   ]);
 });
 
-test("role dashboard never offers delete for the default role", () => {
+test("role settings never offer delete for the default role", () => {
   const actions: unknown[] = [];
   const component = dashboard((action) => actions.push(action));
+  component.handleInput("j");
   component.handleInput("d");
   assert.deepEqual(actions, []);
   assert.match(component.render(100).join("\n"), /Default role cannot be deleted/);

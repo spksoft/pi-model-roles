@@ -36,13 +36,13 @@ test("explicit startup choice outranks restored auto, while explicit resume surv
   process.argv = [...previousArgv, "--model", "fixture/default"];
   const h = await sdkHarness();
   try {
-    assert.match(h.ui.statuses.get("model-roles") ?? "", /paused/);
-    await h.session.prompt("/model-roles auto");
-    assert.doesNotMatch(h.ui.statuses.get("model-roles") ?? "", /paused/);
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=disabled/);
+    await h.session.prompt("/model-roles enable");
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=enabled/);
     await h.session.reload();
-    assert.doesNotMatch(h.ui.statuses.get("model-roles") ?? "", /paused/);
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=enabled/);
     await h.session.extensionRunner.emit({ type: "session_start", reason: "resume" });
-    assert.match(h.ui.statuses.get("model-roles") ?? "", /paused/);
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=disabled/);
     assert.equal(h.faux.state.callCount, 0);
   } finally {
     await h.close();

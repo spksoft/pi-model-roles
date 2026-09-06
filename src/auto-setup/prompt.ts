@@ -32,9 +32,9 @@ function modelId(model: ModelRef): string {
 export const proposalSubmissionGuidance =
   "Use model_roles_submit_auto_setup_proposal only for an active Auto Setup request. Submit one accepted proposal; after a validation rejection, correct the reported fields and retry once with the same requestId and generation. Stop after acceptance, an inactive request, or a second rejection. It stores a review draft and never applies configuration.";
 
-export const roleDesignGuidance = `Design the role portfolio before writing individual recommendations:
+export const roleDesignGuidance = `Design the role portfolio before writing individual recommendations. Treat every description as a compact classification prompt with an observable trigger, a clear boundary, and an explicit near-miss:
 - Recommend the smallest useful set of roles, not one role per selected model. Each role needs a meaningful task boundary and a justified model/effort advantage. Leave the remaining task space to default.
-- Write each description as selection criteria that can be judged from the user's new task text alone. Prefer one compact sentence beginning with "Use when". Name observable task traits such as scope, uncertainty, risk, required modality, or need for cross-file reasoning.
+- Write each description as one compact sentence beginning with "Use when" whose selection criteria can be judged from the user's new task text alone. Name observable task traits such as scope, uncertainty, risk, required modality, or need for cross-file reasoning; include a concise exclusion when a likely near-miss would otherwise overlap.
 - Make roles mutually distinct. If one realistic task could clearly satisfy multiple descriptions, narrow, combine, or remove roles. Do not depend on role order: overlapping matches fall back to default.
 - Keep execution instructions out of descriptions. Do not say how to perform the work, invoke tools, run tests, adopt a persona, or follow a workflow. Put model evidence in rationale, effort evidence in effortRationale, and limitations in uncertainty/tradeoff—not in description.
 - Do not mention a model/provider name, price, speed, benchmark, or reasoning effort in description. Describe the task boundary, not the implementation choice.
@@ -47,7 +47,7 @@ Few-shot description examples (illustrative criteria only; do not copy these IDs
 - Bad — "Use the fast model for easy work." It mentions the assignment and uses subjective criteria instead of observable task traits.
 - Bad — "Write tests, run lint, and produce clean code." These are execution instructions, not routing criteria.
 
-Before submitting, test every proposed description against at least three imagined tasks: one clear match, one near-miss that must not match, and one task intended for another proposed role. Rewrite or remove any role whose boundary is ambiguous. Ensure description explains when, rationale explains why this model, and effortRationale explains why this effort.`;
+Before submitting, test every proposed description against at least three imagined tasks: one clear match, one near-miss that must not match, and one task intended for another proposed role. Then perform a pairwise overlap check across all descriptions. Rewrite or remove any role whose trigger or exclusion is ambiguous. Ensure description explains when, rationale explains why this model, and effortRationale explains why this effort.`;
 
 const proposalContract = `The tool call takes { requestId, generation, proposal }. The proposal must use this exact contract; unknown keys are rejected:
 - proposal: { version: 1, summary, assessments, roles, default? }. Do not add schemaVersion, kind, metadata, or routing fields.

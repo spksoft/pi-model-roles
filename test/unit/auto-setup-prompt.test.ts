@@ -44,10 +44,14 @@ test("research prompt preserves exact models and evidence limitations", () => {
 function assertRoleDesignGuidance(prompt: string): void {
   assert.ok(prompt.includes(roleDesignGuidance));
   assert.match(prompt, /smallest useful set of roles, not one role per selected model/);
+  assert.match(prompt, /compact classification prompt/);
+  assert.match(prompt, /one compact sentence beginning with "Use when"/);
   assert.match(prompt, /new task text alone/);
+  assert.match(prompt, /concise exclusion when a likely near-miss/);
   assert.match(prompt, /overlapping matches fall back to default/);
   assert.match(prompt, /Good — quick_fix: "Use when/);
   assert.match(prompt, /one clear match, one near-miss/);
+  assert.match(prompt, /pairwise overlap check/);
   assert.match(prompt, /description explains when, rationale explains why this model/);
 }
 

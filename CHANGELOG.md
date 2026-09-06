@@ -16,11 +16,15 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ### Model roles
 
+- Simplify `/model-roles` to Settings, Enable/Disable Auto Selector, and Use-role subcommands. The footer now states `auto-selector=enabled|disabled`; direct role use preserves that state, so enabled routing may choose another role on the next eligible prompt while disabled routing pins the selected/current role.
+- Put Auto Setup first in Settings and make the remaining role surface CRUD-only, removing use, pause/global-toggle, reload, reset, and status operations from the role dashboard.
+- Open Auto Setup review automatically after research or refinement settles, using a deferred idle callback rather than requiring a separate review command or blocking `agent_settled` dispatch.
+- Strengthen generated role-description guidance as a compact classification prompt: “Use when” observable triggers, near-miss exclusions, and pairwise overlap checks.
 - Fix model selection in role creation, custom-role editing, and default-role editing—not only Auto Setup. Every picker now shows at most eight models per page, shrinks on short terminals, and truncates text by display width.
 - Match Pi's type-to-search behavior using its fuzzy matcher and input component: arrows/PgUp/PgDn navigate, Enter selects, Ctrl+U clears, and Escape/Ctrl+C cancel immediately. Honor configured selection bindings and forward input focus for IME positioning. Remove Auto Setup's separate `/` search mode and conflicting letter-navigation shortcuts.
 
 - Start with one `default` role that inherits Pi's model and thinking effort. Default-only use adds no selector request.
-- Manage custom roles through a keyboard-first `/model-roles` dashboard: select a role and press Enter to edit, or use A/U/D for direct create/use/delete without a per-role submenu. The dashboard clearly distinguishes session pause from globally saved automatic-routing enablement.
+- Manage custom roles through keyboard-first Settings: select a role and press Enter to edit, use A to create, or D to delete. Direct role use and Auto Selector enable/disable remain explicit command actions outside Settings.
 - Choose a role automatically for each new idle interactive prompt using at most one request to the default model. Use a safe fallback when no role clearly matches or selection fails.
 - Preserve manual and explicit startup/caller choices. Pause/resume automation or apply a named role yourself.
 

@@ -1,4 +1,4 @@
-import type { ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { mergeProposal } from "../auto-setup/merge.js";
 import type { AutoSetupDraft, MergeChoice } from "../auto-setup/types.js";
 import { displayModel, sameModel } from "../core/model-identity.js";
@@ -87,7 +87,7 @@ async function chooseMerge(
 async function applyDraft(
   controller: RolesController,
   setup: AutoSetupController,
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
   draft: AutoSetupDraft,
 ): Promise<void> {
   const snapshot = await controller.store.load(false);
@@ -170,7 +170,7 @@ async function applyDraft(
 
 export async function startAutoSetup(
   setup: AutoSetupController,
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
 ): Promise<boolean> {
   const models = availableModels(ctx);
   if (!models.length) {
@@ -199,7 +199,7 @@ export async function startAutoSetup(
 export async function reviewAutoSetup(
   controller: RolesController,
   setup: AutoSetupController,
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
 ): Promise<boolean> {
   const draft = setup.currentDraft;
   if (!draft) {

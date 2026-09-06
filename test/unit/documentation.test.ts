@@ -21,13 +21,27 @@ test("published configuration examples parse and API documents every reason", as
   const configuration = await readFile("docs/configuration.md", "utf8");
   const compatibility = await readFile("docs/compatibility.md", "utf8");
   for (const command of [
-    "/model-roles auto-setup",
-    "/model-roles auto-setup review",
-    "/model-roles auto-setup cancel",
+    "/model-roles settings",
+    "/model-roles enable",
+    "/model-roles disable",
+    "/model-roles use <role>",
   ]) {
     assert.ok(readme.includes(command), `README missing ${command}`);
     assert.ok(configuration.includes(command), `configuration missing ${command}`);
   }
+  for (const removed of [
+    "/model-roles status",
+    "/model-roles reload",
+    "/model-roles pause",
+    "/model-roles auto-setup",
+  ]) {
+    assert.ok(!readme.includes(removed), `README still documents removed command ${removed}`);
+    assert.ok(
+      !configuration.includes(removed),
+      `configuration still documents removed command ${removed}`,
+    );
+  }
+  assert.match(readme, /opens the review automatically/i);
   assert.match(readme, /one to eight/i);
   assert.match(compatibility, /cannot make arbitrary normal-agent tools read-only/i);
 });
