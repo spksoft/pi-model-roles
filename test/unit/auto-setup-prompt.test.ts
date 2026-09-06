@@ -24,5 +24,10 @@ test("research prompt preserves exact models and evidence limitations", () => {
   assert.match(prompt, /Do not guess that a gateway alias/);
   assert.match(prompt, /not a sandbox/);
   assert.match(prompt, /no new role is useful/);
+  assert.match(prompt, /proposal: \{ version: 1, summary, assessments, roles, default\? \}/);
+  assert.match(prompt, /Do not add schemaVersion, kind, metadata, or routing fields/);
+  assert.match(prompt, /accessedAt and publishedAt use YYYY-MM-DD/);
+  assert.match(prompt, /mappingSource is that assessment's zero-based source index/);
+  assert.match(prompt, /Use no other keys at any level/);
   assert.match(prompt, /generation 2/);
 });

@@ -29,6 +29,15 @@ function modelId(model: ModelRef): string {
   return `${model.provider}/${model.id}`;
 }
 
+const proposalContract = `The tool call takes { requestId, generation, proposal }. The proposal must use this exact contract; unknown keys are rejected:
+- proposal: { version: 1, summary, assessments, roles, default? }. Do not add schemaVersion, kind, metadata, or routing fields.
+- assessments: exactly one per selected model. Each is { model: { provider, id }, status, summary, sources, caveats, upstream? }. status is one of official_sources_cited, no_official_evidence_found, offline_knowledge, identity_unresolved.
+- sources: each is { title, url, accessedAt, publishedAt?, benchmark?, result?, metric?, harness?, split?, version? }. url must be HTTPS; accessedAt and publishedAt use YYYY-MM-DD. official_sources_cited requires at least one source; offline_knowledge requires none.
+- upstream, when documented by a source in that assessment, is { provider, id, mappingSource }, where mappingSource is that assessment's zero-based source index. Do not include upstream when identity is unresolved.
+- roles may be empty. Each proposed role is { id, model: { provider, id }, effort, description, rationale, effortRationale, evidenceModels, uncertainty, tradeoff? }. model and every evidenceModels entry must be a selected exact model; effort must be supported by that model.
+- default is optional and deliberate only: { model: { provider, id }, effort, rationale, effortRationale, evidenceModels, uncertainty, tradeoff? }. Omit it to preserve the current default.
+Use no other keys at any level.`;
+
 export function buildResearchPrompt(input: {
   requestId: string;
   generation: number;
@@ -41,6 +50,8 @@ Research every exact selected serving model below. If web/search tools are avail
 For each model, report exactly one assessment with status official_sources_cited, no_official_evidence_found, offline_knowledge, or identity_unresolved. Source URLs are agent-reported, not independently verified. Include reported access dates, publication dates when known, benchmark result/metric/harness/split/version only when the source supports them, and meaningful caveats. Never invent citations, prices, latency, benchmark results, or comparable aggregate scores.
 
 Recommend zero or more roles. A selected model does not require a role. Every proposed role must use one selected exact model and one of its supported efforts, explain when it applies, why the model and effort fit, its evidence basis, uncertainty, and a trade-off when relevant. It may conclude that no new role is useful. Do not change default configuration unless you submit a deliberate default recommendation.
+
+${proposalContract}
 
 Selected candidates:
 ${candidatesText(input.candidates)}

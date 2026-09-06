@@ -8,6 +8,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 - Add an optional primary-TUI Auto Setup flow: select up to eight cached available models, ask the current Pi model to research them with its configured tools when available, then review/discuss/cancel a bounded proposal before any role save.
 - Show mixed per-model evidence states, agent-reported citations and caveats, exact-model identity limits, offline/no-evidence outcomes, and reasoned role/effort recommendations. Auto Setup does not bundle a search provider, credentials, a benchmark database, or a tool sandbox.
+- Give the research agent the exact bounded proposal contract used by the review handoff, preventing otherwise-valid reports from being rejected solely for undocumented field names.
 - Preserve active model/effort, routing mode, top-level role settings, and untouched unavailable roles. Users explicitly choose conflict/default/custom-role replacement behavior and separately confirm first-custom-role routing effects.
 - Add immediate proposal-authority cancellation, settled-only review readiness, conservative review-only session-draft restoration, and revision-bound atomic configuration application.
 
