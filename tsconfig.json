@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "baseUrl": ".",
+    "paths": { "pi-model-roles": ["./src/index.ts"] },
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "examples/**/*.ts"]
+}

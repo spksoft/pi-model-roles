@@ -1,0 +1,61 @@
+{
+  "name": "pi-model-roles",
+  "version": "0.1.0",
+  "description": "Simple, explicit model roles for Pi",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "pi-package"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "pi": {
+    "extensions": [
+      "./dist/extension.js"
+    ]
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "CHANGELOG.md",
+    "docs/api.md",
+    "docs/configuration.md",
+    "docs/compatibility.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/unit/*.test.ts",
+    "test:integration": "node --import tsx --test --test-concurrency=1 test/integration/*.test.ts",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run test:integration"
+  },
+  "dependencies": {
+    "yaml": "2.9.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12",
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-tui": "0.85.1",
+    "@types/node": "22.19.0",
+    "pi-subagents": "0.65.1",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3"
+  }
+}
