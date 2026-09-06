@@ -283,7 +283,7 @@ export class AutoSetupController {
         ok: false,
         reason:
           error instanceof AutoSetupValidationError
-            ? `Proposal was rejected (${error.code}).`
+            ? `Proposal was rejected (${error.code} at ${error.field}). Correct the field to match the tool schema.`
             : "Proposal was rejected.",
       };
     }

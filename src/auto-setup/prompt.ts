@@ -29,14 +29,19 @@ function modelId(model: ModelRef): string {
   return `${model.provider}/${model.id}`;
 }
 
+export const proposalSubmissionGuidance =
+  "Use model_roles_submit_auto_setup_proposal only for an active Auto Setup request. Submit one accepted proposal; after a validation rejection, correct the reported fields and retry once with the same requestId and generation. Stop after acceptance, an inactive request, or a second rejection. It stores a review draft and never applies configuration.";
+
 const proposalContract = `The tool call takes { requestId, generation, proposal }. The proposal must use this exact contract; unknown keys are rejected:
 - proposal: { version: 1, summary, assessments, roles, default? }. Do not add schemaVersion, kind, metadata, or routing fields.
 - assessments: exactly one per selected model. Each is { model: { provider, id }, status, summary, sources, caveats, upstream? }. status is one of official_sources_cited, no_official_evidence_found, offline_knowledge, identity_unresolved.
-- sources: each is { title, url, accessedAt, publishedAt?, benchmark?, result?, metric?, harness?, split?, version? }. url must be HTTPS; accessedAt and publishedAt use YYYY-MM-DD. official_sources_cited requires at least one source; offline_knowledge requires none.
+- caveats: a required array of zero to ${AUTO_SETUP_LIMITS.caveatsPerCandidate} non-empty strings, each at most ${AUTO_SETUP_LIMITS.caveat} characters; never provide a scalar string. Example: "caveats": ["Agent-reported; not independently verified."]. Use [] when none.
+- sources: an array of at most ${AUTO_SETUP_LIMITS.sourcesPerCandidate} records per assessment; each is { title, url, accessedAt, publishedAt?, benchmark?, result?, metric?, harness?, split?, version? }. url must be HTTPS; accessedAt and publishedAt use YYYY-MM-DD. official_sources_cited requires at least one source; offline_knowledge requires none.
 - upstream, when documented by a source in that assessment, is { provider, id, mappingSource }, where mappingSource is that assessment's zero-based source index. Do not include upstream when identity is unresolved.
-- roles may be empty. Each proposed role is { id, model: { provider, id }, effort, description, rationale, effortRationale, evidenceModels, uncertainty, tradeoff? }. model and every evidenceModels entry must be a selected exact model; effort must be supported by that model.
+- roles: an array of at most ${AUTO_SETUP_LIMITS.customRoles} recommendations; may be empty. Each proposed role is { id, model: { provider, id }, effort, description, rationale, effortRationale, evidenceModels, uncertainty, tradeoff? }. model and every evidenceModels entry must be a selected exact model; effort must be supported by that model.
 - default is optional and deliberate only: { model: { provider, id }, effort, rationale, effortRationale, evidenceModels, uncertainty, tradeoff? }. Omit it to preserve the current default.
-Use no other keys at any level.`;
+- summary, description, rationale, effortRationale, uncertainty, and tradeoff are strings, not arrays. evidenceModels is a non-empty array of distinct { provider, id } objects.
+All text fields must be non-empty, trimmed, and without line breaks or ASCII control characters. Follow the tool schema's string-length and array-size limits. Use no other keys at any level.`;
 
 export function buildResearchPrompt(input: {
   requestId: string;
@@ -56,7 +61,7 @@ ${proposalContract}
 Selected candidates:
 ${candidatesText(input.candidates)}
 
-When ready, call model_roles_submit_auto_setup_proposal exactly once with requestId ${JSON.stringify(input.requestId)}, generation ${input.generation}, and a complete structured proposal. Do not rely on prose alone; the proposal tool is the only Auto Setup handoff. Its result will be reviewed by the user only after this normal agent run settles.`);
+When ready, call model_roles_submit_auto_setup_proposal with requestId ${JSON.stringify(input.requestId)}, generation ${input.generation}, and a complete structured proposal. ${proposalSubmissionGuidance} Do not rely on prose alone; the proposal tool is the only Auto Setup handoff. Its result will be reviewed by the user only after this normal agent run settles.`);
 }
 
 export function buildRefinementPrompt(input: {
@@ -71,7 +76,9 @@ export function buildRefinementPrompt(input: {
 
 The user asks: ${JSON.stringify(input.question)}
 
-Here is the previous bounded, user-reviewable proposal. It is agent-reported evidence, not verified fact. Keep exact selected refs and supported efforts. If you revise it, call model_roles_submit_auto_setup_proposal exactly once with requestId ${JSON.stringify(input.requestId)}, generation ${input.generation}, and a complete replacement proposal. If no revision is warranted, explain that in prose; the prior reviewed draft stays available.
+Here is the previous bounded, user-reviewable proposal. It is agent-reported evidence, not verified fact. Keep exact selected refs and supported efforts. If you revise it, call model_roles_submit_auto_setup_proposal with requestId ${JSON.stringify(input.requestId)}, generation ${input.generation}, and a complete replacement proposal. ${proposalSubmissionGuidance} If no revision is warranted, explain that in prose; the prior reviewed draft stays available.
+
+${proposalContract}
 
 Previous proposal:\n${JSON.stringify(input.draft.proposal)}`;
   return bounded(text);

@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { Static } from "typebox";
+import Value from "typebox/value";
+import { autoSetupProposalSchema, autoSetupSubmissionSchema } from "../../src/auto-setup/schema.js";
+import type { AutoSetupProposal } from "../../src/auto-setup/types.js";
 import type { AvailableModel } from "../../src/core/types.js";
 import { AUTO_SETUP_LIMITS } from "../../src/auto-setup/limits.js";
 import { AutoSetupValidationError, validateProposal } from "../../src/auto-setup/validation.js";
@@ -98,6 +102,113 @@ test("Auto Setup accepts a mixed per-model evidence report", () => {
   assert.equal(result.assessments.length, 4);
   assert.equal(result.roles[0]?.model.id, "fast");
   assert.equal(result.assessments[2]?.status, "offline_knowledge");
+  assert.equal(Value.Check(autoSetupProposalSchema, proposal()), true);
+  // Keep the model-facing schema and persisted domain type assignable in both directions.
+  const schemaTyped: Static<typeof autoSetupProposalSchema> = result;
+  const domainTyped: AutoSetupProposal = schemaTyped;
+  assert.deepEqual(domainTyped, result);
+});
+
+test("tool schema exposes bounded caveat arrays and accepts the full optional contract", () => {
+  const schema = autoSetupSubmissionSchema.properties.proposal;
+  const caveats = schema.properties.assessments.items.properties.caveats;
+  assert.equal(caveats.type, "array");
+  assert.equal(caveats.items.type, "string");
+  assert.equal(Reflect.get(caveats, "maxItems"), AUTO_SETUP_LIMITS.caveatsPerCandidate);
+  assert.equal(Reflect.get(caveats.items, "maxLength"), AUTO_SETUP_LIMITS.caveat);
+  assert.ok(schema.properties.assessments.items.required.includes("caveats"));
+  const value = {
+    ...proposal(),
+    default: {
+      model: models[0]!.ref,
+      effort: "high",
+      rationale: "Deliberate synthetic default recommendation.",
+      effortRationale: "Advertised by the fixture registry.",
+      evidenceModels: [models[0]!.ref],
+      uncertainty: "Synthetic evidence only.",
+      tradeoff: "No measured comparison.",
+    },
+  };
+  Object.assign(value.assessments[0]!, {
+    upstream: { provider: "developer", id: "base", mappingSource: 0 },
+  });
+  Object.assign(value.roles[0]!, { tradeoff: "Synthetic comparison only." });
+  assert.equal(
+    Value.Check(autoSetupSubmissionSchema, {
+      requestId: "12345678-test",
+      generation: 1,
+      proposal: value,
+    }),
+    true,
+  );
+  assert.doesNotThrow(() => validateProposal(value, models));
+});
+
+for (const caveats of [
+  [],
+  ["A meaningful limitation."],
+  Array(AUTO_SETUP_LIMITS.caveatsPerCandidate).fill("x".repeat(AUTO_SETUP_LIMITS.caveat)),
+]) {
+  test(`caveat arrays with ${caveats.length} entries are accepted without coercion`, () => {
+    const value = proposal();
+    value.assessments[0]!.caveats = caveats;
+    assert.equal(Value.Check(autoSetupProposalSchema, value), true);
+    assert.deepEqual(validateProposal(value, models).assessments[0]!.caveats, caveats);
+  });
+}
+
+for (const [name, caveats, code, field] of [
+  [
+    "scalar string from the reported failure",
+    "Agent-reported; not verified.",
+    "invalid_caveats",
+    "assessments[0].caveats",
+  ],
+  ["missing array", undefined, "invalid_caveats", "assessments[0].caveats"],
+  ["null array", null, "invalid_caveats", "assessments[0].caveats"],
+  ["object", { text: "Not a string array." }, "invalid_caveats", "assessments[0].caveats"],
+  ["non-string item", [42], "invalid_text", "assessments[0].caveats[0]"],
+  ["empty item", [""], "invalid_text", "assessments[0].caveats[0]"],
+  [
+    "too many items",
+    Array(AUTO_SETUP_LIMITS.caveatsPerCandidate + 1).fill("Caveat."),
+    "invalid_caveats",
+    "assessments[0].caveats",
+  ],
+  [
+    "overlong item",
+    ["x".repeat(AUTO_SETUP_LIMITS.caveat + 1)],
+    "invalid_text",
+    "assessments[0].caveats[0]",
+  ],
+] as const) {
+  test(`schema and runtime reject caveats: ${name}`, () => {
+    const value = proposal();
+    Object.assign(value.assessments[0]!, { caveats });
+    assert.equal(Value.Check(autoSetupProposalSchema, value), false);
+    assert.throws(
+      () => validateProposal(value, models),
+      (error: unknown) =>
+        error instanceof AutoSetupValidationError && error.code === code && error.field === field,
+    );
+  });
+}
+
+test("tool schema rejects unknown keys at every object level", () => {
+  const value = proposal();
+  const objects = [
+    value,
+    value.assessments[0]!,
+    value.assessments[0]!.model,
+    value.assessments[0]!.sources[0]!,
+    value.roles[0]!,
+  ];
+  for (const object of objects) {
+    Object.assign(object, { unexpected: true });
+    assert.equal(Value.Check(autoSetupProposalSchema, value), false);
+    assert.throws(() => validateProposal(value, models), AutoSetupValidationError);
+    Reflect.deleteProperty(object, "unexpected");
+  }
 });
 
 for (const [name, mutate, code] of [
