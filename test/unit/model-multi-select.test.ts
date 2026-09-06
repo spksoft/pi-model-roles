@@ -38,6 +38,45 @@ test("multi-select caps selection at eight and returns cloned exact refs", () =>
   assert.ok(renders > 0);
 });
 
+test("multi-select fuzzy search filters the list and keeps selections by exact model ref", () => {
+  const component = new ModelMultiSelect(
+    models,
+    { requestRender() {} } as unknown as TUI,
+    theme,
+    () => undefined,
+  );
+  component.handleInput("/");
+  component.handleInput("8");
+  assert.match(component.render(80).join("\n"), /model-8/);
+  assert.doesNotMatch(component.render(80).join("\n"), /model-7/);
+  component.handleInput(" ");
+  assert.deepEqual(component.values(), [{ provider: "fixture", id: "model-8" }]);
+});
+
+test("multi-select renders one fixed-size page and supports page navigation", () => {
+  const manyModels = Array.from({ length: 17 }, (_, index) => ({
+    ref: { provider: "fixture", id: `page-model-${index}` },
+    efforts: ["off"] as const,
+    images: false,
+    contextWindow: 1,
+  }));
+  const component = new ModelMultiSelect(
+    manyModels,
+    { requestRender() {} } as unknown as TUI,
+    theme,
+    () => undefined,
+  );
+  const firstPage = component.render(80).join("\n");
+  assert.match(firstPage, /Page 1\/3 · 1–8 of 17/);
+  assert.match(firstPage, /page-model-7/);
+  assert.doesNotMatch(firstPage, /page-model-8/);
+  component.handleInput("\u001b[6~");
+  const secondPage = component.render(80).join("\n");
+  assert.match(secondPage, /Page 2\/3 · 9–16 of 17/);
+  assert.match(secondPage, /page-model-8/);
+  assert.doesNotMatch(secondPage, /page-model-16/);
+});
+
 test("multi-select escape cancels and render remains readable", () => {
   let result: unknown = "not-called";
   const component = new ModelMultiSelect(

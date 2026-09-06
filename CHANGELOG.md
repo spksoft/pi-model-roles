@@ -7,6 +7,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 ### Auto Setup
 
 - Add an optional primary-TUI Auto Setup flow: select up to eight cached available models, ask the current Pi model to research them with its configured tools when available, then review/discuss/cancel a bounded proposal before any role save.
+- Keep the Auto Setup model picker page-sized (eight rows), with fuzzy search and keyboard pagination for large model catalogs.
 - Show mixed per-model evidence states, agent-reported citations and caveats, exact-model identity limits, offline/no-evidence outcomes, and reasoned role/effort recommendations. Research and refinement now use a shared role-design rubric, positive/negative few-shot descriptions, and pairwise overlap checks to favor a small set of task-observable routing criteria. Auto Setup does not bundle a search provider, credentials, a benchmark database, or a tool sandbox.
 - Expose the complete nested Auto Setup tool schema instead of an untyped proposal; document `caveats` as a bounded string array in research and refinement prompts. Cover the reported scalar-caveat failure through Pi 0.85.1's schema-based argument conversion.
 - Report safe validation field paths and instruct the agent to make one correction attempt with the same request ID/generation, replacing the conflicting exactly-once submission instruction. Accepted, cancelled, and stale requests retain their existing authority checks.
