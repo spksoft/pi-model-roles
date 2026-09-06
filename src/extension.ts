@@ -21,7 +21,7 @@ export default function modelRoles(pi: ExtensionAPI): void {
   let autoSetupToolRegistered = false;
   let disposeService: (() => void) | undefined;
   pi.registerCommand("model-roles", {
-    description: "Configure model roles and automatic selection",
+    description: "Manage task-routing roles",
     getArgumentCompletions: (prefix) =>
       [
         "settings",

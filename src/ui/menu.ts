@@ -7,9 +7,12 @@ import type { AutoSetupController } from "../pi/auto-setup-controller.js";
 import type { RolesController } from "../pi/controller.js";
 import { reviewAutoSetup, startAutoSetup } from "./auto-setup.js";
 import { confirmFirstCustomRoleRouting, saveRoleConfig } from "./config-save.js";
+import { showRoleDashboard } from "./role-dashboard.js";
+
 export function roleSummary(id: string, role: DefaultRole): string {
-  return `${id} — ${role.model === "inherit" ? "inherit Pi default" : displayModel(role.model)} · ${role.effort}`;
+  return `${id} · ${role.model === "inherit" ? "Pi default" : displayModel(role.model)} · ${role.effort}`;
 }
+
 async function editRole(
   controller: RolesController,
   ctx: ExtensionContext,
@@ -19,16 +22,17 @@ async function editRole(
   if (!snapshot) return;
   const draft = structuredClone(snapshot.config);
   let id = existingId;
+  const editing = Boolean(id);
   if (!id) {
     if (Object.keys(draft.roles).length >= LIMITS.roles) {
-      ctx.ui.notify("At most 32 roles are supported.", "warning");
+      ctx.ui.notify("You can create up to 32 roles.", "warning");
       return;
     }
-    id = (await ctx.ui.input("Role identifier", "fast"))?.trim();
+    id = (await ctx.ui.input("Create role — step 1 of 4: short role ID", "quick"))?.trim();
     if (!id) return;
     if (!ROLE_ID.test(id) || RESERVED_IDS.has(id) || Object.hasOwn(draft.roles, id)) {
       ctx.ui.notify(
-        "Use a unique lowercase identifier (letters, numbers, _ or -), up to 48 characters.",
+        "Use a unique lowercase ID (letters, numbers, _ or -; up to 48 characters).",
         "warning",
       );
       return;
@@ -38,39 +42,45 @@ async function editRole(
   const old = draft.roles[id];
   if (id !== "default") {
     description = await ctx.ui.editor(
-      "When should this role be used? (selection criteria, not execution instructions)",
+      `${editing ? "Edit" : "Create"} role — step 2 of 4: when should Pi choose it?`,
       old && "description" in old ? old.description : "",
     );
     if (description === undefined) return;
     description = description.trim();
     if (!description || Array.from(description).length > LIMITS.description) {
-      ctx.ui.notify("Describe when to use the role in 1–2000 characters.", "warning");
+      ctx.ui.notify("Describe when Pi should choose this role (1–2000 characters).", "warning");
       return;
     }
   }
   const models = availableModels(ctx);
-  const inherited = "Inherit Pi default";
-  const labels = models.map((model, index) => `${index + 1}. ${displayModel(model.ref)}`);
+  const inherited = "Use Pi default model";
+  const labels = models.map((model) => displayModel(model.ref));
   if (id === "default") labels.unshift(inherited);
   if (!labels.length) {
-    ctx.ui.notify("No available models. Configure a provider in Pi first.", "warning");
+    ctx.ui.notify("No models are available. Configure a provider in Pi first.", "warning");
     return;
   }
   const choice = await ctx.ui.select(
-    `Model${old ? ` (current: ${old.model === "inherit" ? "inherit" : displayModel(old.model)})` : ""}`,
+    `${editing ? "Edit" : "Create"} role — step 3 of 4: choose a model`,
     labels,
   );
   if (!choice) return;
-  const model = choice === inherited ? "inherit" : models[Number.parseInt(choice, 10) - 1]?.ref;
+  const model =
+    choice === inherited
+      ? "inherit"
+      : models.find((item) => displayModel(item.ref) === choice)?.ref;
   if (!model) return;
   const resolved = model === "inherit" ? controller.baseline.model : model;
   const capabilities = models.find((item) => sameModel(item.ref, resolved));
   const efforts = [...(id === "default" ? ["inherit"] : []), ...(capabilities?.efforts ?? [])];
   if (!efforts.length) {
-    ctx.ui.notify("No supported effort for this model.", "warning");
+    ctx.ui.notify("That model has no supported reasoning effort.", "warning");
     return;
   }
-  const effort = await ctx.ui.select("Select execution effort explicitly", efforts);
+  const effort = await ctx.ui.select(
+    `${editing ? "Edit" : "Create"} role — step 4 of 4: choose reasoning effort`,
+    efforts,
+  );
   if (!effort) return;
   const updatedRole: RoleConfig["roles"][string] =
     id === "default"
@@ -81,51 +91,43 @@ async function editRole(
           description: description ?? "",
         };
   draft.roles[id] = updatedRole;
-  // Recheck a withdrawn model before committing the draft; unknown saved roles stay visible.
   if (model !== "inherit" && !availableModels(ctx).some((item) => sameModel(item.ref, model))) {
-    ctx.ui.notify("Model is no longer available. Start the edit again.", "warning");
+    ctx.ui.notify("That model is no longer available. Start the edit again.", "warning");
     return;
   }
   if (
     !(await ctx.ui.confirm(
-      "Save role?",
-      `${roleSummary(id, updatedRole)}${description ? `\n${description}` : ""}\nMenu saves normalize YAML formatting/comments.`,
+      `${editing ? "Save changes" : "Create role"}?`,
+      `${roleSummary(id, updatedRole)}${description ? `\n${description}` : ""}`,
     ))
   )
     return;
   if (!(await confirmFirstCustomRoleRouting(ctx, snapshot.config, draft))) return;
   await saveRoleConfig(controller, ctx, draft, snapshot.revision);
 }
-async function manageRole(
+
+async function deleteRole(
   controller: RolesController,
   ctx: ExtensionContext,
   id: string,
 ): Promise<void> {
-  const options = ["Edit", "Use for this session", ...(id !== "default" ? ["Delete"] : []), "Back"];
-  const action = await ctx.ui.select(`Role: ${id}`, options);
-  if (action === "Edit") await editRole(controller, ctx, id);
-  if (action === "Use for this session") await controller.use(ctx, id);
-  if (action === "Delete") {
-    const snapshot = controller.store.snapshot;
-    if (
-      !snapshot ||
-      id === "default" ||
-      !(await ctx.ui.confirm(
-        "Delete role?",
-        `Delete ${id}? The current execution model is not changed.`,
-      ))
-    )
-      return;
-    const draft = structuredClone(snapshot.config);
-    delete draft.roles[id];
-    await saveRoleConfig(controller, ctx, draft, snapshot.revision);
-  }
+  const snapshot = controller.store.snapshot;
+  if (
+    !snapshot ||
+    id === "default" ||
+    !(await ctx.ui.confirm("Delete role?", `Delete “${id}”? Your current model will not change.`))
+  )
+    return;
+  const draft = structuredClone(snapshot.config);
+  delete draft.roles[id];
+  await saveRoleConfig(controller, ctx, draft, snapshot.revision);
 }
+
 async function reset(controller: RolesController, ctx: ExtensionContext): Promise<void> {
   if (
     !(await ctx.ui.confirm(
-      "Reset model role configuration?",
-      `Replace only ${controller.store.path} with the inherited default role? Custom roles will be lost. Pi's own defaults remain unchanged.`,
+      "Reset model-role configuration?",
+      `Remove all custom roles from ${controller.store.path}? Pi's own defaults will not change.`,
     ))
   )
     return;
@@ -136,11 +138,12 @@ async function reset(controller: RolesController, ctx: ExtensionContext): Promis
     ctx.ui.notify("Model roles reset.", "info");
   } catch {
     ctx.ui.notify(
-      "Reset failed. Check the config file and lock; non-regular or oversized files require manual repair.",
+      "Reset failed. Check the configuration file and its lock, then repair it manually.",
       "warning",
     );
   }
 }
+
 export async function showMenu(
   controller: RolesController,
   setup: AutoSetupController,
@@ -149,67 +152,89 @@ export async function showMenu(
   while (controller.active) {
     const snapshot = controller.store.snapshot;
     const roles = Object.entries(snapshot?.config.roles ?? {}).sort(([a], [b]) =>
-      a === "default" ? -1 : b === "default" ? 1 : a < b ? -1 : a > b ? 1 : 0,
+      a === "default" ? -1 : b === "default" ? 1 : a.localeCompare(b),
     );
     const models = availableModels(ctx);
-    const rows = roles.map(([id, role]) => {
-      const ref = role.model === "inherit" ? controller.baseline.model : role.model;
-      const model = models.find((item) => sameModel(item.ref, ref));
-      const warning = !model
-        ? " [unavailable]"
-        : role.effort !== "inherit" && !model.efforts.includes(role.effort)
-          ? " [effort will clamp]"
-          : "";
-      return roleSummary(id, role) + warning;
+    const action = await showRoleDashboard(ctx.ui, {
+      roles: roles.map(([id, role]) => {
+        const ref = role.model === "inherit" ? controller.baseline.model : role.model;
+        const model = models.find((item) => sameModel(item.ref, ref));
+        const warning = !model
+          ? " [unavailable]"
+          : role.effort !== "inherit" && !model.efforts.includes(role.effort)
+            ? " [effort adjusted]"
+            : "";
+        return {
+          id,
+          summary: roleSummary(id, role) + warning,
+          description: "description" in role ? role.description : undefined,
+        };
+      }),
+      routingEnabled: snapshot?.config.enabled ?? false,
+      sessionMode: controller.mode,
+      baseline: `${displayModel(controller.baseline.model)} · ${controller.baseline.effort}`,
+      configPath: controller.store.path,
+      warning: controller.store.error?.message,
     });
-    const controls = [
-      "Add role",
-      "Auto Setup",
-      controller.mode === "manual" ? "Resume auto-routing" : "Pause routing",
-      snapshot?.config.enabled ? "Disable automatic routing" : "Enable automatic routing",
-      "Status",
-      "Reload",
-      "Reset configuration",
-      "Close",
-    ];
-    const choice = await ctx.ui.select(
-      `Model roles · ${controller.mode} · inherited ${displayModel(controller.baseline.model)}:${controller.baseline.effort}\n${controller.store.path}${controller.store.error ? `\nWarning: ${controller.store.error.message}` : ""}`,
-      [...rows, ...controls],
-    );
-    if (!choice || choice === "Close") return;
-    const index = rows.indexOf(choice);
-    const selectedRole = roles[index];
-    if (selectedRole) {
-      await manageRole(controller, ctx, selectedRole[0]);
-      continue;
-    }
-    if (choice === "Add role") await editRole(controller, ctx);
-    else if (choice === "Auto Setup") {
-      const launched = setup.currentDraft
-        ? await reviewAutoSetup(controller, setup, ctx)
-        : await startAutoSetup(setup, ctx);
-      if (launched) return;
-    } else if (choice === "Resume auto-routing") controller.resume(ctx);
-    else if (choice === "Pause routing") controller.pause(ctx);
-    else if (choice === "Reload") await controller.reload(ctx);
-    else if (choice === "Reset configuration") await reset(controller, ctx);
-    else if (choice === "Status") showStatus(controller, ctx);
-    else if (snapshot)
+    if (action.type === "close") return;
+    if (action.type === "add") await editRole(controller, ctx);
+    else if (action.type === "edit") await editRole(controller, ctx, action.id);
+    else if (action.type === "delete") await deleteRole(controller, ctx, action.id);
+    else if (action.type === "use") await controller.use(ctx, action.id);
+    else if (action.type === "toggle-session")
+      controller.mode === "manual" ? controller.resume(ctx) : controller.pause(ctx);
+    else if (action.type === "toggle-routing" && snapshot)
       await saveRoleConfig(
         controller,
         ctx,
         { ...snapshot.config, enabled: !snapshot.config.enabled },
         snapshot.revision,
       );
+    else if (action.type === "reload") await controller.reload(ctx);
+    else if (action.type === "reset") await reset(controller, ctx);
+    else if (action.type === "status") showStatus(controller, ctx);
+    else if (action.type === "auto-setup") {
+      const launched = setup.currentDraft
+        ? await reviewAutoSetup(controller, setup, ctx)
+        : await startAutoSetup(setup, ctx);
+      if (launched) return;
+    }
   }
 }
+
 export function showStatus(controller: RolesController, ctx: ExtensionContext): void {
   const decision = controller.lastDecision;
+  const routing =
+    controller.mode === "auto"
+      ? "Automatic routing is active"
+      : "Routing is paused for this session";
+  if (!decision) {
+    ctx.ui.notify(`${routing}. No task has been routed in this session yet.`, "info");
+    return;
+  }
+  if (decision.status === "selected" || decision.status === "preserved") {
+    const selected = decision.role ? `role “${decision.role}”` : "the default role";
+    const fallback = decision.fallback
+      ? ` Pi used a fallback because ${decision.reason.replaceAll("_", " ")}.`
+      : "";
+    let selector = "";
+    if (decision.selector) {
+      selector = ` Selector: ${displayModel(decision.selector.model)} in ${decision.selector.durationMs} ms.`;
+      if (decision.selector.usage)
+        selector = ` Selector: ${displayModel(decision.selector.model)} in ${decision.selector.durationMs} ms (${decision.selector.usage.totalTokens} tokens).`;
+    }
+    ctx.ui.notify(
+      `${routing}. Last task used ${selected}: ${displayModel(decision.model)} · ${decision.effort}.${fallback}${selector}`,
+      "info",
+    );
+    return;
+  }
   ctx.ui.notify(
-    `Model roles: ${controller.mode}; ${controller.store.path}\n${decision ? JSON.stringify(decision) : "No routing decision yet."}`,
+    `${routing}. The last routing attempt did not change the model (${decision.reason.replaceAll("_", " ")}).`,
     "info",
   );
 }
+
 export async function handleCommand(
   controller: RolesController,
   setup: AutoSetupController,
@@ -219,7 +244,7 @@ export async function handleCommand(
   if (!controller.active || ctx.mode !== "tui") {
     if (ctx.hasUI)
       ctx.ui.notify(
-        "Model role menus require a primary TUI session. Headless hosts should use the selection API.",
+        "Model-role management requires a primary TUI session. Headless hosts can use the selection API.",
         "warning",
       );
     return;
@@ -242,7 +267,7 @@ export async function handleCommand(
     await reviewAutoSetup(controller, setup, ctx);
   else
     ctx.ui.notify(
-      "Use /model-roles [settings|status|reload|pause|auto|auto-setup [review|cancel]|use <role>].",
+      "Use /model-roles [settings|status|reload|pause|auto|use <role>|auto-setup [review|cancel]].",
       "info",
     );
 }

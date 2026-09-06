@@ -17,8 +17,8 @@ The separate [GitHub installation flow](../../README.md#install-from-github) mus
 ## First use and role management
 
 - [ ] First activation exposes `/model-roles` with exactly one inherited `default`; no onboarding, model switch, or selector request occurs.
-- [ ] Default appears first. The configuration path and resolved inherited model/effort are readable, and default has no Delete/Rename action.
-- [ ] Add a role with keyboard only. Enter multiline English/non-English and IME-composed text; choose a model and effort explicitly. Review and cost/provider disclosure are understandable.
+- [ ] Dashboard shows default first, the configuration path and resolved inherited model/effort, and plainly distinguishes global automatic-routing enablement from the session-only pause. Default has no Delete/Rename action.
+- [ ] Add, edit, use, and delete a custom role with keyboard only: A/Enter/U/D, arrows or j/k, and Escape. Enter multiline English/non-English and IME-composed text; choose a model and effort explicitly. Review and cost/provider disclosure are understandable.
 - [ ] Cancel at identifier, description, model, effort, review, and first-role disclosure. No file/model changes occur.
 - [ ] Edit default to a concrete model, then restore inheritance. Pi's saved defaults remain unchanged.
 - [ ] Use a named role from the menu and `/model-roles use <role>`. It applies without a selector request and pauses automation.

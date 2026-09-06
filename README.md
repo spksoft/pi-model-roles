@@ -32,11 +32,10 @@ You can select `default` → **Edit** to choose a different model or effort for 
 
 ### Add a role
 
-1. Open `/model-roles` and choose **Add role**.
-2. Enter a short identifier, such as `quick`.
-3. Describe **when to use it**, for example: “Use for small, well-specified edits that do not require design decisions.”
-4. Choose an available model, then an explicitly supported thinking effort. Effort controls the model's reasoning level; models without reasoning use `off`.
-5. Review and confirm the save. The first custom-role save also explains the extra request, cost, and provider data flow.
+1. Open `/model-roles` and press **A** to add a role.
+2. Enter a short identifier, such as `quick`, then describe **when Pi should choose it**—for example: “Use for small, well-specified edits that do not require design decisions.”
+3. Choose an available model and a supported reasoning effort. Models without reasoning use `off`.
+4. Review and confirm the save. The first custom-role save also explains the extra request, cost, and provider data flow.
 
 Possible role descriptions—not built-in presets:
 
@@ -47,7 +46,7 @@ Possible role descriptions—not built-in presets:
 
 Choose models you already use in Pi. Keep descriptions distinct: overlapping matches fall back to `default`. Descriptions are **selection criteria, not instructions to the executing model**. Keep actual coding or writing instructions in your prompt or `AGENTS.md`.
 
-Cancel any editing step with Escape to leave the draft unsaved. To edit, use, or delete a saved role, select it in the menu.
+Cancel any editing step with Escape to leave the draft unsaved. In the role manager, select a role with arrows (or `j`/`k`), then use **Enter** to edit, **U** to use it now, or **D** to delete it. The default role cannot be deleted.
 
 ## How it works
 
@@ -89,7 +88,7 @@ Run these commands **inside Pi**, not in your shell:
 | `/model-roles auto-setup cancel` | Immediately revoke a pending Auto Setup proposal. If its normal agent turn is still running, Pi cancellation remains cooperative. |
 | `/model-roles reload` | Reload saved roles and inherited defaults without clearing the session pause. |
 
-The menu also offers **Disable automatic routing** (saved globally), **Enable automatic routing**, and **Reset configuration**. Disabling keeps your roles and current model; reset deletes custom roles after confirmation. Other open sessions see saved changes after reload.
+The role manager shows global and session routing separately. Press **P** to pause/resume routing only for this session; **G** turns automatic routing on/off everywhere (a saved setting); **S** opens **Auto Setup (research recommendations)**; **R** reloads; and **X** resets configuration. Disabling keeps your roles and current model; reset deletes custom roles after confirmation. Other open sessions see saved changes after reload.
 
 **Escape during the selector loader cancels the submitted task**, restores its text, and prevents execution. Images may need reattachment. If a model switch is already underway, wait for it to finish before changing sessions; see the [model-switch limitation](docs/compatibility.md#model-switch-limitation).
 

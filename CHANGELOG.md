@@ -16,7 +16,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 ### Model roles
 
 - Start with one `default` role that inherits Pi's model and thinking effort. Default-only use adds no selector request.
-- Manage custom roles through `/model-roles`: describe when to use each role, select its model and effort, then confirm the save.
+- Manage custom roles through a keyboard-first `/model-roles` dashboard: select a role and press Enter to edit, or use A/U/D for direct create/use/delete without a per-role submenu. The dashboard clearly distinguishes session pause from globally saved automatic-routing enablement.
 - Choose a role automatically for each new idle interactive prompt using at most one request to the default model. Use a safe fallback when no role clearly matches or selection fails.
 - Preserve manual and explicit startup/caller choices. Pause/resume automation or apply a named role yourself.
 

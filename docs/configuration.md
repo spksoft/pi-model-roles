@@ -8,16 +8,16 @@ For most users, **`/model-roles` is the only configuration tool needed**. Use it
 
 | Goal | Steps in `/model-roles` |
 | --- | --- |
-| Add a role | **Add role** → identifier → when-to-use description → model → effort → review and save. |
-| Change a role | Select the role → **Edit**. Review all fields before saving. |
-| Change the default | Select `default` → **Edit**. Choose a model and effort, or restore **Inherit Pi default** and `inherit`. |
-| Choose a role yourself | Select the role → **Use for this session**, or run `/model-roles use <role>`. This pauses automation. |
-| Remove a custom role | Select the role → **Delete** → confirm. This does not change the active execution model. |
-| Stop automation temporarily | **Pause routing**, or `/model-roles pause`. Resume with `/model-roles auto`. |
-| Stop automation across sessions | **Disable automatic routing**. This saves `enabled: false`; existing sessions must reload to see it. |
-| Start over | **Reset configuration** → confirm. This removes custom roles and restores the inherited default configuration. |
+| Add a role | Press **A** → identifier → when-to-use description → model → effort → review and save. |
+| Change a role | Select the role with arrows (or `j`/`k`) → **Enter**. Review all fields before saving. |
+| Change the default | Select `default` → **Enter**. Choose a model and effort, or restore **Use Pi default model** and `inherit`. |
+| Choose a role yourself | Select the role → **U**, or run `/model-roles use <role>`. This pauses automation. |
+| Remove a custom role | Select the role → **D** → confirm. This does not change the active execution model. |
+| Stop automation temporarily | Press **P**, or run `/model-roles pause`. Resume with `/model-roles auto`. |
+| Stop automation across sessions | Press **G**. This saves `enabled: false`; existing sessions must reload to see it. |
+| Start over | Press **X** → confirm. This removes custom roles and restores the inherited default configuration. |
 
-The default role cannot be deleted or renamed. Menu edits remain drafts until confirmed, and cancelling leaves the model and file unchanged. Saving a role does not immediately switch the execution model; **Use for this session** does.
+The dashboard labels session pause and global enablement separately, so a session-only pause is not confused with the saved global setting. The default role cannot be deleted or renamed. Role edits remain drafts until confirmed, and cancelling leaves the model and file unchanged. Saving a role does not immediately switch the execution model; **U** does.
 
 ## Auto Setup
 
