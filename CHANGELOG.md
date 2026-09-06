@@ -1,12 +1,31 @@
 # Changelog
 
+User-visible changes to pi-model-roles. For installation and everyday use, start with the [README](README.md).
+
 ## 0.1.0 — Unreleased
 
-- Add a single inherited `default` role, native `/model-roles` menus, and cancel-safe custom role editing.
-- Persist strict version-1 YAML outside the package installation, with atomic conflict-aware saves and explicit recovery/reset.
-- Route new idle interactive tasks through at most one default-model selector; preserve manual/startup/caller choices and use finite capability-aware fallbacks.
-- Keep descriptions out of execution prompts; record only safe decision/selector-usage metadata.
-- Export a non-mutating selection API and session-targeted event service; include an opt-in tested native pi-subagents example.
-- Add credential-free unit/SDK/storage/menu/package validation and a manual terminal checklist.
+### Model roles
 
-Initial compatibility: Node >=22.19.0, Pi 0.85.1, optional pi-subagents 0.65.1. See `docs/compatibility.md` for the in-flight Pi model-setter limitation and outstanding visual TUI verification. Public publication and licensing are not part of this implementation.
+- Start with one `default` role that inherits Pi's model and thinking effort. Default-only use adds no selector request.
+- Manage custom roles through `/model-roles`: describe when to use each role, select its model and effort, then confirm the save.
+- Choose a role automatically for each new idle interactive prompt using at most one request to the default model. Use a safe fallback when no role clearly matches or selection fails.
+- Preserve manual and explicit startup/caller choices. Pause/resume automation or apply a named role yourself.
+
+### Configuration and privacy
+
+- Save roles in a user-wide YAML file outside the installed package so they survive updates and removal. Detect invalid configuration and conflicting saves without silently overwriting user data.
+- Send task text and role descriptions to the selector, not conversation history or images. Role descriptions do not become execution instructions. The selected execution provider receives Pi's normal conversation and attachments.
+- Report safe decision details and separate selector usage without creating a routing log or duplicating task text in routing metadata.
+
+### Integrations and documentation
+
+- Provide a non-mutating selection API and session-targeted event service for explicit integrations. Include an optional native pi-subagents example; do not automatically intercept other launchers.
+- Document installation from [github.com/spksoft/pi-model-roles](https://github.com/spksoft/pi-model-roles), including the currently required source build after install/update.
+- Organize guides around getting started, how selection works, configuration, troubleshooting, and integration. Add contributor guidance to keep related user documentation updated with user-visible changes.
+- Include credential-free unit/integration/package checks and a [manual terminal checklist](https://github.com/spksoft/pi-model-roles/blob/main/test/manual/tui-checklist.md).
+
+### Compatibility and known limitations
+
+Requires Node.js **22.19.0 or newer**; tested with **Pi 0.85.1** and optional **pi-subagents 0.65.1**. An already-started Pi model switch cannot be cancelled atomically, and human visual TUI acceptance is not yet claimed. See [compatibility](docs/compatibility.md) for details.
+
+The package remains `UNLICENSED`; no public npm release is assumed.

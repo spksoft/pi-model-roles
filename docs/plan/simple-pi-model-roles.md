@@ -1,5 +1,7 @@
 # Simple model roles for Pi — implementation plan
 
+**Historical design record, not a current user guide.** This plan predates the implementation. Its proposed file layout, installation approach, acceptance goals, and verification statements describe that planning stage, not current support. Start with the [README](../../README.md) for GitHub installation and usage, [configuration](../configuration.md) for settings, and [compatibility](../compatibility.md) for tested behavior and known limits. The original plan below is retained for context.
+
 > Generated 2026-09-06T06:00:56.235Z · sha256:0b0debaf311325f97942dbccb3ed6dc5e0210a1f4fb083c796aa350e4ab03c67
 
 ## Summary
@@ -11,6 +13,7 @@ Build a small, provider-agnostic Pi package with an immediately available settin
 An installable npm-format Pi extension that works without setup using only the default role. Users can manage roles through /model-roles; when multiple roles exist, new idle interactive prompts are classified by the resolved default model and executed with the selected role's model and effort. Manual choices remain authoritative. Other packages can request the same selection without changing the parent session, then launch their own children through their existing protocols.
 
 ## Acceptance criteria
+
 - A fresh interactive activation with no configuration exposes /model-roles and creates exactly one role named default, with model and effort set to inherit. It introduces no provider/model dependency, no blocking onboarding wizard, and no selector request.
 - The default role cannot be deleted or renamed. Users can replace its inherited model/effort and later restore inheritance. Saving changes never writes Pi's defaultProvider, defaultModel, defaultThinkingLevel, authentication, or other package settings.
 - A non-default role requires a unique identifier, a nonempty natural-language description of when to use it, an exact provider/model reference, and an explicitly selected supported effort. Users can add, edit, use, and delete custom roles with cancel-safe native Pi dialogs.
@@ -29,6 +32,7 @@ An installable npm-format Pi extension that works without setup using only the d
 ## Scope
 
 ### In scope
+
 - A new TypeScript/ESM package, initially tested against @earendil-works/pi-coding-agent 0.85.1 and Node.js >=22.19.0.
 - Native /model-roles settings and session-control menus, available immediately after activation.
 - One user-global YAML configuration, strict validation, safe initialization and atomic conflict-aware saves.
@@ -40,6 +44,7 @@ An installable npm-format Pi extension that works without setup using only the d
 - Credential-free tests, package validation, README/API/configuration documentation, and initial changelog.
 
 ### Out of scope
+
 - Implementing anything during this planning run; only the HTML plan is published.
 - Modifying Pi core, pi-subagents, other installed packages, or AGENTS.md.
 - Transparent interception of every subagent tool, rewriting workflow scripts, monkey-patching launchers, or creating a new subagent runner.
@@ -53,6 +58,7 @@ An installable npm-format Pi extension that works without setup using only the d
 - Public npm publication, registry-name reservation, release credentials, and choosing a project license on the owner's behalf.
 
 ## Constraints
+
 - Confirmed Q1: provide a documented selection API for any package and a tested pi-subagents example; the other package owns execution and policy.
 - Confirmed Q2: select at a new task boundary and hold the model through its tool loop and retries; delegated tasks are selected independently.
 - Confirmed Q3: manual model/effort choices pause session automation until explicitly resumed; preserve explicit startup and subagent choices.
@@ -66,6 +72,7 @@ An installable npm-format Pi extension that works without setup using only the d
 - Use only public runtime APIs. Installed source inspection informs lifecycle tests, not private imports in production.
 
 ## Findings
+
 - **This is a greenfield implementation rather than a refactor.**
   - Repository /Users/spksoft/Projects/pi-model-roles contains only AGENTS.md outside .git.
   - Inspected branch main at commit 015d86f, 'docs: add agent guidance'. git status --short was empty before publication.
@@ -202,6 +209,7 @@ flowchart TD
 ```
 
 ## Implementation tasks
+
 ### T1 — Establish package foundations and typed contracts
 
 **What:** Create the minimal TypeScript/ESM package, quality commands, and versioned domain contracts without embedding a routing implementation in the extension entry point.
@@ -215,12 +223,14 @@ flowchart TD
 **Depends on:** None
 
 **Validation:**
+
 - npm run typecheck succeeds with strict settings.
 - A minimal node:test case runs through npm test without credentials.
 - Build output exposes separate extension and selection-library entry points.
 - No AGENTS.md changes or hardcoded live model defaults are introduced.
 
 #### Subtasks
+
 ##### T1.1 — Create reproducible build and quality commands
 
 **What:** Add package metadata, build configuration, development dependencies, and documented scripts.
@@ -234,6 +244,7 @@ flowchart TD
 **Depends on:** T1
 
 **Validation:**
+
 - Inspect the package manifest for zero install/postinstall scripts.
 - Run the formatter/linter on the initial scaffold.
 - Build once and verify dist contains declarations and resolvable ESM imports.
@@ -251,6 +262,7 @@ flowchart TD
 **Depends on:** T1.1
 
 **Validation:**
+
 - Compile negative type fixtures for invalid effort, model reference, and decision variants.
 - Assert the default factory returns only default and never shares mutable objects.
 - Test that decision serialization contains no prompt, description, credential, or provider response field.
@@ -268,6 +280,7 @@ flowchart TD
 **Depends on:** T1.2
 
 **Validation:**
+
 - Prove the fake transport rejects unplanned outbound requests.
 - Assert fake calls record model identity and options without writing task text to reports.
 - Run independent simultaneous fake requests and verify no state bleed.
@@ -285,12 +298,14 @@ flowchart TD
 **Depends on:** T1
 
 **Validation:**
+
 - Round-trip the one-role and custom-role examples, preserving multiline descriptions and exact identities.
 - Test malformed YAML, duplicate keys, unknown version/fields, aliases, oversized files, and invalid role values.
 - Test read-only paths, interrupted writes, competing saves, and stale-lock recovery behavior.
 - Verify initial load never replaces an existing malformed file.
 
 #### Subtasks
+
 ##### T2.1 — Validate and serialize the version-1 schema
 
 **What:** Implement a safe YAML codec and actionable field-level validation.
@@ -304,6 +319,7 @@ flowchart TD
 **Depends on:** T1.2, T1.3
 
 **Validation:**
+
 - Table-test all schema fields and limits, including Unicode descriptions and quoted off values.
 - Verify duplicate default/custom keys cannot silently overwrite one another.
 - Assert YAML errors do not include credential-like fixture values or descriptions.
@@ -321,6 +337,7 @@ flowchart TD
 **Depends on:** T2.1
 
 **Validation:**
+
 - Run two-process save tests and confirm stale drafts are rejected rather than lost.
 - Inject failures before write, before rename, and after rename; the final file is always old-valid or new-valid.
 - Verify custom PI_CODING_AGENT_DIR and directories with spaces.
@@ -339,6 +356,7 @@ flowchart TD
 **Depends on:** T2.2
 
 **Validation:**
+
 - Verify a failed reload retains the last valid snapshot but does not mark the file valid.
 - Verify a cold invalid load preserves Pi's active model and leaves repair menus available.
 - Assert no model request or catalog refresh occurs during load, save, or reload.
@@ -356,12 +374,14 @@ flowchart TD
 **Depends on:** T1, T2
 
 **Validation:**
+
 - Verify inheritance does not drift after an automatic model switch.
 - Verify custom-provider fake completion follows Pi's configured runtime rather than a separately constructed credential client.
 - Test supported effort lists, scope filters, missing models, and auth absence.
 - Ensure no routing-path registry refresh or live probe occurs.
 
 #### Subtasks
+
 ##### T3.1 — Resolve inherited defaults and explicit startup choices
 
 **What:** Implement stable default inheritance and conservative CLI choice provenance.
@@ -375,6 +395,7 @@ flowchart TD
 **Depends on:** T1.2, T1.3, T2.3
 
 **Validation:**
+
 - Test saved defaults, unset defaults, invalid saved defaults, trusted/untrusted project defaults, and custom agent directories.
 - Route to fast, reload, and assert default still resolves to Pi's saved baseline or the retained original baseline.
 - Test actual CLI option forms and prompt strings containing '--model' without creating false pins.
@@ -393,6 +414,7 @@ flowchart TD
 **Depends on:** T1.2, T1.3
 
 **Validation:**
+
 - Test duplicate bare IDs across providers, IDs containing slashes, unavailable providers, and changing capability maps.
 - Test off-only models and each supported effort level.
 - Test explicit empty restrictions, ordinary unscoped Pi sessions, and stricter caller-owned restrictions.
@@ -411,6 +433,7 @@ flowchart TD
 **Depends on:** T3.1, T3.2
 
 **Validation:**
+
 - Assert exactly one request goes to the default model even while the session is on another role.
 - Simulate timeout during authentication, provider hang, aborted/errored completion, and late success; no stale result is applied.
 - Exercise built-in-style and dynamically registered fake providers through real Pi APIs.
@@ -429,12 +452,14 @@ flowchart TD
 **Depends on:** T1, T2, T3
 
 **Validation:**
+
 - Table-test normal selection, default-only routing, explicit pins, disabled routing, unavailable roles, and every fallback branch.
 - Assert one classifier call at most and zero calls on deterministic bypass paths.
 - Test strict JSON handling and deterministic ambiguity behavior.
 - Run cancellation and concurrent-request tests without shared session mutations.
 
 #### Subtasks
+
 ##### T4.1 — Encode precedence and finite fallback policy
 
 **What:** Implement the ordered local decision rules and deduplicated fallback resolution.
@@ -448,6 +473,7 @@ flowchart TD
 **Depends on:** T1.2, T2.3, T3.2
 
 **Validation:**
+
 - Use a precedence table covering every pair of conflicting inputs.
 - Assert invalid explicit models never silently change providers.
 - Test default/role/current identities that are equal to prove termination and no repeated attempts.
@@ -466,6 +492,7 @@ flowchart TD
 **Depends on:** T4.1, T3.3
 
 **Validation:**
+
 - Test no match, one match, overlapping descriptions, reordered role maps, duplicate IDs, unknown IDs, and extra keys.
 - Use synthetic prompt-injection fixtures requesting secrets, arbitrary models, or tools; only allowlisted role selection or fallback is possible.
 - Assert role descriptions never appear in execution-system-prompt mutations.
@@ -484,6 +511,7 @@ flowchart TD
 **Depends on:** T4.2
 
 **Validation:**
+
 - Run simultaneous requests with different defaults, allowlists, roles, and signals; cancel one without affecting another.
 - Inject credential-like/task sentinel strings and assert they do not appear in decisions or diagnostics.
 - Verify no selector call changes the fake parent's model, effort, tools, messages, or settings.
@@ -502,12 +530,14 @@ flowchart TD
 **Depends on:** T2, T3, T4
 
 **Validation:**
+
 - Verify selected model/effort are effective before Pi's first execution request and pre-prompt compaction.
 - Assert zero reclassification during tool loops, retries, queued continuations, or extension wakeups.
 - Test manual choices, reload/resume/fork/tree navigation, config changes, and shutdown during pending classification.
 - Verify no automatic routing or config bootstrap occurs in known child/headless contexts.
 
 #### Subtasks
+
 ##### T5.1 — Route only eligible new interactive submissions
 
 **What:** Register lifecycle hooks and implement the exact task-boundary gate.
@@ -521,6 +551,7 @@ flowchart TD
 **Depends on:** T2.3, T3.1, T4.3
 
 **Validation:**
+
 - Drive actual Pi input event ordering with a fake provider and check that routing precedes execution preflight.
 - Assert input text and images remain unchanged on success/fallback.
 - Test cancellation restores text, prevents execution, and does not persist attachment content.
@@ -539,6 +570,7 @@ flowchart TD
 **Depends on:** T5.1, T3.2, T4.1
 
 **Validation:**
+
 - Simulate setModel false/throw, effort clamping, model removal, and effort setter failure.
 - Change the model manually while classification or authentication awaits; the stale role must never win.
 - Assert failed role effort is not left on the fallback/current model.
@@ -557,6 +589,7 @@ flowchart TD
 **Depends on:** T5.2
 
 **Validation:**
+
 - Test automatic fast selection followed by reload does not become a manual pin.
 - Test manual model and effort changes pause until explicit resume, including after branch navigation.
 - Test unsupported/restored custom-entry versions safely preserve the actual Pi session.
@@ -576,12 +609,14 @@ flowchart TD
 **Depends on:** T2, T3, T5
 
 **Validation:**
+
 - Complete add/edit/delete/use/reset flows with a fake UI and verify exact persisted YAML.
 - Cancel at every wizard step and confirm no partial configuration or model change.
 - Verify default cannot be removed and custom roles require description/model/effort.
 - Manually check keyboard-only operation, long provider names, multiline/non-English descriptions, and narrow terminals.
 
 #### Subtasks
+
 ##### T6.1 — Expose discoverable role and routing menus
 
 **What:** Implement the immediately available main menu and status view.
@@ -595,6 +630,7 @@ flowchart TD
 **Depends on:** T2.3, T3.2, T5.3
 
 **Validation:**
+
 - Assert menu registration occurs even without config or credentials.
 - Verify the initial menu contains exactly the default role and an Add role action.
 - Test noninteractive invocation returns actionable guidance without blocking UI or corrupting stdout protocol.
@@ -612,6 +648,7 @@ flowchart TD
 **Depends on:** T6.1, T2.2
 
 **Validation:**
+
 - Test blank/duplicate/reserved IDs, empty descriptions, no available models, off-only models, and all cancellation points.
 - Verify changing default in the menu does not alter Pi's settings file.
 - Verify the first additional-role save explains the extra selector call and that the selected execution provider receives the normal conversation.
@@ -630,6 +667,7 @@ flowchart TD
 **Depends on:** T6.2, T5.3
 
 **Validation:**
+
 - Test pause/use/auto precedence over multi-role configuration and restoration.
 - Verify deleting the last custom role returns to zero-selector behavior.
 - Verify reset affects only the configured package YAML after confirmation.
@@ -648,12 +686,14 @@ flowchart TD
 **Depends on:** T3, T4, T5
 
 **Validation:**
+
 - Import the packed library from a separate consumer fixture.
 - Request different child models concurrently and assert the parent never changes.
 - Exercise the process-local event request with correct/wrong sessions, cancellation, missing listeners, and reload.
 - Verify model and thinking reach the pi-subagents native child through the public contract without modifying launcher policy.
 
 #### Subtasks
+
 ##### T7.1 — Expose a small side-effect-free selection library
 
 **What:** Export selectModelForTask, request/decision types, and dependency interfaces from the package root.
@@ -667,6 +707,7 @@ flowchart TD
 **Depends on:** T4.3, T3.2
 
 **Validation:**
+
 - Importing the API performs no I/O or extension registration.
 - Verify explicit agent/run choices skip classification and remain exact.
 - Verify an effort-only pin retains the current caller model.
@@ -685,6 +726,7 @@ flowchart TD
 **Depends on:** T7.1, T5.3
 
 **Validation:**
+
 - Load two fake session instances on one bus and verify only the targeted instance handles a request.
 - Test absent listener, unsupported version, malformed input, duplicate listener, teardown, and cancellation.
 - Assert events return no raw prompt in result metadata and never call setModel on the parent.
@@ -703,6 +745,7 @@ flowchart TD
 **Depends on:** T7.2, T5.1
 
 **Validation:**
+
 - Assert native child first request uses the selected model/effort and parent state is unchanged.
 - Assert explicit child model/effort results in zero classifier calls.
 - Verify missing/incompatible pi-subagents returns actionable unsupported status rather than launching by another mode.
@@ -722,12 +765,14 @@ flowchart TD
 **Depends on:** T1, T2, T3, T4, T5, T6, T7
 
 **Validation:**
+
 - Run npm run format:check, npm run lint, npm run typecheck, npm test, npm run test:integration, and npm run build.
 - Inspect npm pack output and load the installed dist extension/API in a disposable isolated fixture.
 - Complete the manual keyboard/resize/cancellation checklist.
 - Confirm no credentials or network are required by ordinary CI and no user-global files are touched by tests.
 
 #### Subtasks
+
 ##### T8.1 — Exercise the complete routing and recovery matrix
 
 **What:** Add cross-module scenarios from first activation through role selection, manual override, reload, and child delegation.
@@ -741,6 +786,7 @@ flowchart TD
 **Depends on:** T5.3, T6.3, T7.3
 
 **Validation:**
+
 - Assert zero selector calls for default-only, manual, disabled, child-ambient, and continuation paths.
 - Assert exactly one bounded selector call for each eligible multi-role task.
 - Verify a smaller-context model is chosen before Pi checks compaction.
@@ -760,6 +806,7 @@ flowchart TD
 **Depends on:** T8.1
 
 **Validation:**
+
 - Validate every YAML example with the production codec and typecheck API examples.
 - Cross-check every exposed option/reason code against the implementation.
 - Ensure documentation does not imply built-in /settings integration, universal subagent interception, fully deterministic LLM selection, or automatic headless routing.
@@ -778,6 +825,7 @@ flowchart TD
 **Depends on:** T8.2
 
 **Validation:**
+
 - All documented quality commands exit successfully.
 - The isolated package loads without tsx, TypeScript, test fixtures, or dev-only imports at runtime.
 - Tarball excludes docs/plan, user YAML, credentials, temporary locks, and repository-local artifacts.
@@ -785,6 +833,7 @@ flowchart TD
 - Record tested versions, fake-provider evidence, manual TUI results, and any unresolved non-blocking limitations.
 
 ## Engineering considerations
+
 ### architecture
 
 Separate pure policy and types from configuration I/O, Pi model/runtime integration, native UI, and inter-package transport. The classifier can only return role matches; local code owns authority, eligibility, ambiguity, and fallback. Reuse Pi's model/authentication runtime and another package's launcher rather than introducing either subsystem. Package exports have no extension-registration side effects.
@@ -814,6 +863,7 @@ Show a compact actual role/model/effort and paused/fallback status; expose safe 
 Default-only and manually pinned paths make no classifier request; use cached registry/configuration snapshots, no background watchers, and no discovery probes. Semantic selection has one request, a bounded payload/output, an 8000 ms default deadline, cancellation, and stale-result rejection; it cannot hold a prompt indefinitely even if a provider ignores cancellation. Reuse native dialogs and Pi keybindings/theme support for keyboard, IME, screen-width, and color-independent state labels. Keep long descriptions in a multiline editor rather than custom terminal rendering.
 
 ## Risks
+
 - **medium: Semantic classification may choose a suboptimal role or vary between identical requests.**
   - Mitigation: Constrain output to eligible role IDs, choose default on ambiguity, expose the decision, preserve manual control, and distinguish deterministic policy from nondeterministic model judgment. Do not add opaque confidence thresholds or hidden heuristics.
 - **medium: The default selector may be slow, unavailable, or costly, especially with reasoning-oriented providers.**
@@ -836,6 +886,7 @@ Default-only and manually pinned paths make no classifier request; use cached re
   - Mitigation: Publish prebuilt dist with an explicit file allowlist, no install-time builds, and a production-style isolated tarball smoke test.
 
 ## Assumptions
+
 - The confirmed release is intentionally smaller than OMP: role selection criteria plus model/effort, not execution personas, toolsets, or predefined fast/slow roles.
   - If false: Execution prompts or additional presets would require new configuration, authority rules, UI, and tests and should be planned separately.
 - An extension-owned /model-roles menu satisfies 'settings menus default present'; no automatic blocking first-run wizard or built-in /settings patch is required.
@@ -858,10 +909,12 @@ Default-only and manually pinned paths make no classifier request; use cached re
   - If false: Git-source distribution and direct library imports from unbuilt checkouts would need an additional build/distribution strategy.
 
 ## Open questions
+
 - Which license and public npm publishing identity should be used before an actual public release? Keep publication out of implementation acceptance until the owner decides.
 - Which additional Pi versions or subagent packages should be added to the compatibility matrix after the verified baseline? None is required for this confirmed first release.
 
 ## End-to-end validation
+
 - Planning evidence: repository/source documentation inspection only; no source edits, dependency installation, builds, tests, migrations, commits, or agent launches were performed in this run.
 - During execution, first verify the scaffold with strict types and fake-provider unit tests; do not use credentials or live provider endpoints.
 - Run configuration tests against disposable directories, including parser abuse, permission failure, interrupted replacement, competing processes, stale drafts, and custom agent roots.

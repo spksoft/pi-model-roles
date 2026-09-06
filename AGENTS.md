@@ -31,7 +31,9 @@
 
 ## Documentation and changes
 
-- Keep README/API documentation aligned with changes to roles, configuration, defaults, and fallback behavior.
+- Any change that users need to know about must update the related documentation in the same change. Treat missing documentation as incomplete work, including for changes to installation, commands, configuration, defaults, routing, fallbacks, costs, privacy, compatibility, limitations, recovery, or public APIs.
+- Start with README.md: keep it focused on what the package does, how it works, GitHub installation via github.com/spksoft/pi-model-roles, and everyday user instructions. Keep detailed configuration, integration, and troubleshooting guidance in the related docs and link to it.
+- Keep command examples, YAML/API examples, documented defaults, and compatibility claims aligned with the implementation. Verify installation instructions against the actual package layout and build requirements; do not imply untested behavior is supported.
+- Update CHANGELOG.md for user-visible behavior changes, and update the manual acceptance checklist when affected workflows change. Keep historical plans clearly labeled rather than presenting them as current user guidance.
 - State compatibility requirements with Pi Agent and supported model providers explicitly.
-- Record user-visible routing changes in the changelog or release notes when the project adopts one.
 - Keep commits focused; do not reformat or alter unrelated files.

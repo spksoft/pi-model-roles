@@ -1,32 +1,118 @@
 # pi-model-roles
 
-Small, explicit model roles for [Pi](https://github.com/earendil-works/pi). Start with **one `default` role**, inheriting Pi's model and thinking effort. Add your own roles using native dialogs; no presets, agent personas, or new subagent runner.
+Choose a model for each kind of task without switching models by hand. **pi-model-roles** adds user-defined model roles to [Pi](https://github.com/earendil-works/pi): you describe when a role should be used, choose its model and thinking effort, and Pi uses that role when a new task clearly matches.
 
-## Install locally
+Start with one **`default`** role that inherits your Pi defaults. Add custom roles only when you need them. Roles select a model and effort; they do not add personas, system instructions, tools, or a new subagent runner.
 
-Requires Node.js **>=22.19.0**. Tested with `@earendil-works/pi-coding-agent` **0.85.1**; other versions are not yet verified. The optional example targets `pi-subagents` **0.65.1**.
+## Install from GitHub
 
-```sh
-npm ci --ignore-scripts
-npm run check
-npm pack --ignore-scripts
-pi install ./pi-model-roles-0.1.0.tgz
+You need **Pi**, **Node.js 22.19.0 or newer**, **npm**, and **Git**. The tested Pi version is **0.85.1**; see [compatibility](docs/compatibility.md) before using other versions. Configure your providers in Pi as usual—this package does not supply models or credentials.
+
+1. Install the repository with Pi:
+
+   ```sh
+   pi install git:github.com/spksoft/pi-model-roles
+   ```
+
+2. Build the installed source checkout. **This step is currently required:** the repository does not commit `dist/`, and installation does not build it automatically.
+
+   ```sh
+   (
+     cd "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/git/github.com/spksoft/pi-model-roles" &&
+     npm ci --ignore-scripts &&
+     npm run build
+   )
+   ```
+
+   These are POSIX-shell commands for a default user-wide installation. If you use Pi's project-local `-l` installation, build in `.pi/git/github.com/spksoft/pi-model-roles` instead. `PI_CODING_AGENT_DIR` is respected when set.
+
+3. Start or restart Pi, or run `/reload` in an open session. Then enter:
+
+   ```text
+   /model-roles
+   ```
+
+No npm registry release or optional subagent package is required. Review third-party extension code before installing: Pi extensions run with your system access.
+
+## Get started
+
+### Keep your usual default
+
+On first use in an interactive terminal session, the package creates a single `default` role. Its model and thinking effort inherit Pi's configured defaults, falling back to the session's original startup values. **With only `default`, there is no extra model-selection request.** Opening the menu does not require a configured provider, but running tasks does.
+
+You can select `default` → **Edit** to choose a different model or effort for this package. Choose **Inherit Pi default** and `inherit` to restore inheritance. The default role cannot be deleted or renamed, and editing it does not change Pi's saved defaults.
+
+### Add a role
+
+1. Open `/model-roles` and choose **Add role**.
+2. Enter a short identifier, such as `quick`.
+3. Describe **when to use it**, for example: “Use for small, well-specified edits that do not require design decisions.”
+4. Choose an available model, then an explicitly supported thinking effort. Effort controls the model's reasoning level; models without reasoning use `off`.
+5. Review and confirm the save. The first custom-role save also explains the extra request, cost, and provider data flow.
+
+Possible role descriptions—not built-in presets:
+
+| Role | When to use it |
+| --- | --- |
+| `quick` | Small, well-specified edits with no design decisions. |
+| `design` | Architecture planning with competing requirements and trade-offs. |
+
+Choose models you already use in Pi. Keep descriptions distinct: overlapping matches fall back to `default`. Descriptions are **selection criteria, not instructions to the executing model**. Keep actual coding or writing instructions in your prompt or `AGENTS.md`.
+
+Cancel any editing step with Escape to leave the draft unsaved. To edit, use, or delete a saved role, select it in the menu.
+
+## How it works
+
+For a new prompt submitted while Pi is idle and automatic routing is enabled:
+
+```text
+Your new task
+  → Check available roles and models
+  → If custom roles are eligible, ask the default model which clearly match
+  → One clear match: use that role; otherwise: use default
+  → Pi runs the task with the chosen model and effort
 ```
 
-Restart Pi or use its `/reload`. Public npm publication and a license are owner decisions; this repository currently uses `UNLICENSED`. The tarball includes prebuilt JavaScript/declarations and has no install/postinstall build. For development, after `npm run build`, load `dist/extension.js` with Pi's `-e` option.
+The **selector** is the extra request that chooses a role. The **execution model** is the model that does your task.
 
-## Use
+- **The selector always uses the resolved default model**, not the model chosen for the previous task. If no custom role is eligible, selection skips the extra request.
+- **At most one selector request runs per eligible prompt**, with no retry and an 8-second default timeout. A failed, invalid, ambiguous, or timed-out response falls back safely.
+- **Fallback order is fixed:** configured `default` → inherited Pi baseline → current permitted, usable model. If none is usable, Pi or the API caller handles the error. The package never picks an arbitrary provider or replays an already-started task.
+- **Selection happens before Pi prepares and runs the task**, including its model checks and context compaction. The chosen model stays active through tools, retries, and queued follow-ups. The next new idle prompt can choose another role.
+- **Manual choices win.** Changing the model or thinking effort yourself pauses automatic routing. Explicit startup choices are preserved. Use `/model-roles auto` when you want automation again.
 
-Run **`/model-roles`** immediately after activation. No onboarding wizard or configured provider is required to open it.
+The fallback rules are deterministic; the model's judgment about a description can vary. This is not a model benchmark or a guarantee of the cheapest or best result.
 
-- **Add role:** identifier → description of when to use it → model → explicit supported effort → review/save.
-- **Edit default:** override its model/effort or restore `inherit`; default cannot be deleted or renamed.
-- **Use a role:** select a model/effort now and pause automatic routing.
-- **Pause / resume / disable / reload / reset:** native menu controls, with destructive confirmations.
+Automatic routing applies to new idle interactive prompts only. Slash-command expansions, steering, extension-generated messages, print/JSON/RPC sessions, and known subagent children are not independently routed. Headless hosts and subagent launchers need an explicit [API integration](docs/api.md).
 
-Commands: `/model-roles [settings|status|reload|pause|auto|use <role>]`.
+## Everyday controls
 
-A fresh primary TUI session creates:
+Run these commands **inside Pi**, not in your shell:
+
+| Command | What it does |
+| --- | --- |
+| `/model-roles` or `/model-roles settings` | Open role management and routing controls. |
+| `/model-roles status` | Show session mode, configuration path, and the latest decision, including fallback reason and selector usage when available. |
+| `/model-roles use quick` | Apply the named role now without classification, then pause automatic routing. Replace `quick` with your role ID. Check status if the role's model is unavailable. |
+| `/model-roles pause` | Keep the current model and effort for this session. |
+| `/model-roles auto` | Clear the session pause; route the next eligible prompt if global routing is enabled. Does not send a request immediately. |
+| `/model-roles reload` | Reload saved roles and inherited defaults without clearing the session pause. |
+
+The menu also offers **Disable automatic routing** (saved globally), **Enable automatic routing**, and **Reset configuration**. Disabling keeps your roles and current model; reset deletes custom roles after confirmation. Other open sessions see saved changes after reload.
+
+**Escape during the selector loader cancels the submitted task**, restores its text, and prevents execution. Images may need reattachment. If a model switch is already underway, wait for it to finish before changing sessions; see the [model-switch limitation](docs/compatibility.md#model-switch-limitation).
+
+## Settings
+
+Roles are stored outside the installed package, usually at:
+
+```text
+~/.pi/agent/extensions/pi-model-roles/config.yaml
+```
+
+With `PI_CODING_AGENT_DIR`, the path is `$PI_CODING_AGENT_DIR/extensions/pi-model-roles/config.yaml`. It is one user-wide file, even for a project-local package installation. Updates and removal leave it available for reuse.
+
+The initial configuration is:
 
 ```yaml
 version: 1
@@ -38,37 +124,42 @@ roles:
     effort: inherit
 ```
 
-Data lives at `getAgentDir()/extensions/pi-model-roles/config.yaml`, usually `~/.pi/agent/extensions/pi-model-roles/config.yaml`. `PI_CODING_AGENT_DIR` is respected. This is outside the installed package; Pi's `settings.json`, authentication, and other packages are never rewritten.
+Use the menu for normal changes. For manual YAML edits, limits, and recovery, see [configuration](docs/configuration.md). Role edits never rewrite Pi's saved model defaults or authentication; Pi itself records package installation in its settings as usual.
 
-## Routing and authority
+## Cost and privacy
 
-With only default (or no eligible custom roles), there is **no classifier call**. With custom roles, each new **idle interactive prompt** makes at most one selector request to the resolved **default model**, not the previously selected worker. Exactly one clear custom-role match selects it. No match, ambiguity, invalid output, timeout, or failure uses a finite fallback: configured default → inherited Pi baseline → current permitted usable model.
+Adding custom roles enables an extra request before eligible tasks, adding **latency and possible provider charges**. Before enabling it, understand the two data flows:
 
-Selection happens in Pi's `input` hook before model/authentication checks and pre-prompt compaction. The selected model stays active through tools, retries, and queued continuations. Slash expansions, steering, extension wake messages, print/JSON/RPC hosts, and known subagent children are not independently routed.
+| Recipient | Data it receives |
+| --- | --- |
+| Default selector provider | Submitted task text and eligible role descriptions. No separately loaded files, conversation history, tools, or image bytes. Text pasted into your task is still task text. |
+| Selected execution provider | Pi's normal conversation, instructions, and attachments. Changing providers can send existing conversation context to another configured provider. |
 
-Manual model/effort changes pause automation until `/model-roles auto`. Explicit startup and API caller choices remain authoritative; an invalid explicit API pin is reported, not silently substituted. Reload preserves session authority and never turns the previous worker into the default selector.
+Role descriptions are saved in your YAML configuration. The package saves safe decision metadata in Pi's session entries, but does not duplicate task text or descriptions there. It creates no routing log, prompt cache, or telemetry; Pi continues to save its ordinary session history. Selector usage is separate from execution usage and may not appear in Pi's usual totals.
 
-**Escape in the selector loader cancels the submission**, restores its text, and does not run the task. Images may need reattachment. See [compatibility](docs/compatibility.md) for the host's in-flight model-switch limitation.
+## Update or remove
 
-## Cost, privacy, and limitations
+Update the GitHub installation from your shell:
 
-Saving the first custom role discloses an additional request's cost, latency, and data flow:
+```sh
+pi update git:github.com/spksoft/pi-model-roles
+```
 
-- The **default selector provider** receives submitted task text and role descriptions only, without history, tools, file content, or image bytes.
-- The **selected execution provider** receives Pi's normal conversation and attachments. Switching providers can therefore expose existing conversation context to another configured provider.
-- Descriptions are selection criteria, **never execution/system instructions**.
-- No routing log, prompt cache, telemetry, raw provider errors, or duplicated task/description data is persisted. Pi itself continues to save its ordinary session history. Selector usage is reported separately from execution usage.
-- Local precedence/fallback is deterministic; the model's semantic judgment is not guaranteed reproducible.
-- No provider discovery/probing occurs on the routing path. Availability and effort come from Pi's cached registry; Pi and callers retain policy authority.
+**Repeat the build step from [installation](#install-from-github) after each update**, then restart Pi or run `/reload`. Pi may clean generated files when updating its managed checkout. Do not keep personal edits or configuration there.
 
-## Integrate and develop
+To remove the package:
 
-`selectModelForTask(request, dependencies)` returns a decision only: it does not mutate sessions or launch work. Independently installed extensions can use the session-targeted `pi-model-roles:select:v1` event. Headless/SDK hosts must opt in through the API.
+```sh
+pi remove git:github.com/spksoft/pi-model-roles
+```
 
-- [Configuration, limits, and recovery](docs/configuration.md)
-- [Library/event API and integration examples](docs/api.md)
-- [Compatibility, validation, and rollback](docs/compatibility.md)
-- [Release notes](CHANGELOG.md)
-- [Manual TUI checklist](test/manual/tui-checklist.md)
+Let any model switch finish, then restart Pi. Your role YAML remains; Pi's saved model defaults do not need restoring. You can also pause routing or disable the extension through `pi config` without uninstalling it.
 
-`npm run check` runs formatting, lint, strict types, unit tests, build, and SDK/package integration tests. Tests use synthetic fake providers, disposable agent directories, and no credentials/live provider access. The packed smoke test uses npm's offline cache populated by `npm ci`. `npm run format` formats maintained source/configuration; no implementation changes are made to Pi or pi-subagents.
+## More documentation
+
+- [Configuration](docs/configuration.md) — role design, YAML reference, and recovery.
+- [Compatibility and troubleshooting](docs/compatibility.md) — supported modes, known limits, and contributor checks.
+- [Integration API](docs/api.md) — selection without session changes, events, and an optional pi-subagents example.
+- [Changelog](CHANGELOG.md) — user-visible changes.
+
+For development, see [contributor validation](docs/compatibility.md#contributor-validation). The package is currently marked `UNLICENSED`; an open-source license and public npm release have not been selected.

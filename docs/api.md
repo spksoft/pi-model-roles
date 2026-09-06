@@ -1,107 +1,181 @@
-# Selection API v1
+# Integrate model selection
 
-The ESM package root exports `selectModelForTask`, `defaultConfig`, `EFFORTS`, `REASONS`, the versioned event helpers, and their TypeScript contracts. Importing it performs no filesystem access, extension registration, credential discovery, or session mutation. Pi packages are peers for extension integration; `yaml` is the only non-Pi runtime dependency.
+[← README](../README.md) · [Configuration](configuration.md) · [Compatibility](compatibility.md)
 
-## Library
+This guide is for extension and SDK authors. **Regular Pi users only need `/model-roles`.** Installing this package does not automatically route other packages' subagents or headless tasks.
+
+The API answers one question: **which model and thinking effort should handle this task?** It returns a decision. Your integration still applies the model, prepares context, checks permissions, and runs the task through its existing execution path.
+
+## Choose an integration
+
+| Your host | Use | Who supplies configuration? |
+| --- | --- | --- |
+| A Node/SDK application with a package dependency | `selectModelForTask(request, dependencies)` | Your application, with its own model and classifier adapters. |
+| An independently installed Pi extension in the same process | `pi-model-roles:select:v1` on `pi.events` | The matching primary interactive session's model-roles service. |
+| A headless host that wants to offer an event service | `registerSelectionService(...)` | Your host, explicitly. No automatic service is registered. |
+| A separate process or external CLI runner | Build your own explicit integration | Events here are process-local, not a remote protocol. |
+
+Resolve your host's explicit model/effort settings **before requesting selection**. A run or agent configuration must not be silently overridden just because it was omitted from the API request.
+
+## Library quickstart
+
+The package is ESM and exports TypeScript declarations. A Pi GitHub installation does not automatically make it a Node dependency of another project. For a standalone consumer, build and pack the repository as described under [contributor validation](compatibility.md#contributor-validation), then install that tarball as a dependency:
+
+```sh
+npm install /path/to/pi-model-roles-0.1.0.tgz
+```
+
+A minimal, provider-free example:
 
 ```ts
 import { defaultConfig, selectModelForTask } from "pi-model-roles";
 
 const model = { provider: "example-provider", id: "owner/example-model" };
 const current = { model, effort: "off" as const };
+
 const decision = await selectModelForTask(
   { task: "A synthetic task", current, baseline: current },
   {
     config: defaultConfig(),
-    models: () => [{ ref: model, efforts: ["off"], images: false, contextWindow: 32000 }],
-    classify: async () => { throw new Error("Default-only never classifies"); },
+    models: () => [
+      { ref: model, efforts: ["off"], images: false, contextWindow: 32000 },
+    ],
+    classify: async () => {
+      throw new Error("Default-only selection does not call the classifier");
+    },
   },
 );
+
 if (decision.status === "selected" || decision.status === "preserved") {
-  // Your host applies decision.model and decision.effort after its own policy checks.
+  // Apply decision.model and decision.effort through your host's own policy.
+} else {
+  // Handle unavailable/cancelled. Do not launch from a missing model.
 }
 ```
 
-No built-in credential client, launcher, or registry is constructed. The caller provides validated configuration and its own adapters. Runtime config/request validation is still performed. The core never writes configuration; the package's menu/store are not public library APIs.
+The model above is a placeholder in a synthetic registry; this example sends no provider request. A real integration supplies eligible models and a classifier adapter when it enables custom roles.
+
+Importing the package performs no filesystem access, extension registration, credential discovery, or session mutation. The core does not load/save YAML or construct a launcher. `yaml` is the only non-Pi runtime dependency; Pi integration packages are peers.
+
+## Request reference
 
 ### `SelectionRequest`
 
 | Field | Requirement / behavior |
 | --- | --- |
-| `task: string` | Required; bounded for classification, never persisted by this package. |
-| `current: {model?, effort}` | Required; caller's current exact pair; effort always required. |
-| `baseline: {model?, effort}` | Required; stable inherited default, not last worker. The primary TUI event owner supplies its own baseline. |
-| `explicitModel?: {provider,id}` | Caller resolved an explicit model pin. Preserve it or return `invalid_explicit`; no silent substitute. |
-| `explicitEffort?: Effort` | Caller resolved an explicit effort pin. Effort-only retains current model. |
-| `requestedRole?: string` | Resolve a configured role directly; no semantic request. An unavailable role follows normal fallback; inspect role/fallback if exact role use is mandatory. |
-| `paused?: boolean` | Default false; preserves current pair without classification. |
-| `allowedModels?: readonly ModelRef[]` | Absent: adapter eligibility only. `[]`: no models. Also restricts the selector. Up to 10,000 exact refs. |
-| `requiresImages?: boolean` | Default false; worker must support images. Caller inspects its own retained context/attachments without forwarding image bytes. |
-| `signal?: AbortSignal` | Cancels selection; never cancellation of worker execution automatically. |
+| `task: string` | Required. Submitted task text; bounded for classification and never persisted by this package. |
+| `current: {model?, effort}` | Required. Caller's current state; effort is always required. |
+| `baseline: {model?, effort}` | Required. Stable inherited default, not the last selected execution model. The primary TUI event service supplies its own baseline. |
+| `explicitModel?: {provider, id}` | Resolved caller model pin. Preserve it or return `invalid_explicit`; never silently substitute another model. |
+| `explicitEffort?: Effort` | Resolved effort pin. An effort-only pin retains the current model. Unsupported explicit effort is rejected. |
+| `requestedRole?: string` | Select a role directly without classification. An unavailable role follows normal fallback; inspect the returned role and `fallback` if exact role use is mandatory. |
+| `paused?: boolean` | Default `false`. Preserve the current pair without classification. |
+| `allowedModels?: readonly ModelRef[]` | Absent: adapter eligibility only. `[]`: no models allowed. Restricts both selector and execution models; at most 10,000 exact references. |
+| `requiresImages?: boolean` | Default `false`. Execution model must support images. Inspect retained context/attachments locally; do not forward image bytes to the selector. |
+| `signal?: AbortSignal` | Cancel selection. Does not automatically cancel subsequent task execution. |
 
-Precedence: explicit model/effort → paused → requested role → disabled configuration → default-only → classifier. Invalid explicit effort is not clamped. An inherited/current effort may be capability-clamped when paired with a different explicitly pinned model; requested/effective effort are returned separately. Resolve launcher frontmatter/run/provider precedence **before** calling: absence means permission to use automatic policy, not a request to override another package's explicit settings.
+Model identity is the exact `{provider, id}` pair. IDs may contain slashes. Effort values are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`, subject to model support.
+
+Precedence is **explicit model/effort → paused → requested role → disabled configuration → default-only → classifier**. Invalid explicit pins are not replaced with defaults. When an explicitly pinned model has no explicit effort, inherited/current effort may be clamped to its capabilities; requested and effective effort are returned separately.
 
 ### `SelectionDependencies`
 
-- `config: RoleConfig`: version-1 settings. A validated copy is used per call.
-- `models(): readonly AvailableModel[]`: synchronous **cached** eligible registry. Each entry contains `ref`, supported `efforts`, `images`, and `contextWindow`. It is read again for final validation; never perform network discovery here.
-- `classify(input): Promise<{text, usage?}>`: request contains exact selector `model`, standalone `systemPrompt`, bounded JSON `text`, `signal`, and `maxTokens`. Forward its signal; do not add execution tools/history or raw error logging. Timeout also settles uncooperative adapters; late results are ignored.
-- `defaultEffort?(model): Effort`: per-model inherited effort; absent uses baseline effort.
-- `now?(): number`: numeric clock for duration; default `Date.now`.
+| Dependency | What your adapter must provide |
+| --- | --- |
+| `config: RoleConfig` | Version-1 configuration. A validated copy is used per call; see the [configuration reference](configuration.md#configuration-reference-version-1). |
+| `models(): readonly AvailableModel[]` | A synchronous, cached eligible registry. Entries contain `ref`, supported `efforts`, `images`, and `contextWindow`. Selection reads it again before returning a final result. Do not perform network discovery here. |
+| `classify(input): Promise<{text, usage?}>` | A standalone selection request using the exact supplied model. Input includes `systemPrompt`, bounded JSON `text`, `signal`, and `maxTokens`. Forward cancellation; do not add execution tools/history or log raw errors. |
+| `defaultEffort?(model): Effort` | Per-model inherited effort. If omitted, baseline effort is used. |
+| `now?(): number` | Numeric clock for durations; defaults to `Date.now`. |
 
-The adapter owns authentication/availability/scope, and should return trusted finite capability values. No authorization is granted by this API. Requests are process-local and independent; caller-owned objects/adapters must not be mutated concurrently while a call is outstanding.
+The classifier must return strict JSON such as `{"matches":["quick"]}`. See [protocol limits](configuration.md#advanced-limits-and-safeguards). Timeout settles selection even if an adapter ignores cancellation; late results are ignored, but adapters should cooperate to stop their own work.
 
-### Decisions
+Your adapter owns authentication, availability, scope, and trusted finite capability values. The API grants no permissions. Requests are independent; do not concurrently mutate caller-owned objects or adapters while a request is outstanding.
 
-All decisions contain `status`, `reason`, `fallback`, and safe `warnings`. `selected` and `preserved` also contain an exact `model`, effective `effort`, `requestedEffort`, and optional `role`. `unavailable` and `cancelled` do not contain an executable model. Optional `selector` contains model, nonnegative duration in milliseconds, and numeric `usage: {input, output, totalTokens, cost}` when supplied. Usage is selector-only and may not be reflected in Pi's ordinary worker totals.
+## Handle the decision
 
-Reasons (exported as `REASONS`):
+| `status` | What to do |
+| --- | --- |
+| `selected` | Apply the returned model/effort after your host's final checks. |
+| `preserved` | Respect the caller's retained choice; do not reinterpret it as permission to reroute. |
+| `unavailable` | Handle the error or repair the request/configuration. There is no executable model in the result. |
+| `cancelled` | Stop this selection attempt. There is no executable model in the result. |
+
+Every result has `reason`, `fallback`, and safe `warnings`. Successful results also have an exact `model`, effective `effort`, `requestedEffort`, and optional `role`.
+
+Optional `selector` metadata contains its model, nonnegative `durationMs`, and numeric `usage: {input, output, totalTokens, cost}` when the adapter supplies it. This measures selection, not task execution, and may not appear in Pi's normal execution totals.
+
+Use `status` and `fallback` to decide what to do; use `reason` to explain the path. Normal fallback is **configured default → inherited baseline → current**, deduplicated by exact identity. No arbitrary model is chosen, and no task is replayed.
+
+### Reason and warning codes
+
+The package exports all reason codes as `REASONS`:
 
 | Reasons | Meaning |
 | --- | --- |
-| `explicit`, `manual`, `disabled` | Local preservation paths; no classifier. |
-| `requested_role`, `default_only`, `matched` | Direct role/default or one validated semantic match. |
-| `no_match`, `ambiguous`, `invalid_response` | Default fallback after classifier parsing. |
-| `selector_failed`, `selector_timeout`, `selector_unavailable` | Transport/default-selector failure. |
-| `input_too_large`, `insufficient_text`, `context_budget` | Classification bypass; default fallback. |
-| `role_unavailable`, `no_usable_model` | Role disappeared or no permitted fallback exists. |
-| `invalid_explicit`, `invalid_request`, `config_invalid` | Caller/config contract requires repair; no silent explicit-pin substitution. |
-| `cancelled`, `stale`, `apply_failed` | Cancellation or TUI application lifecycle outcome. Pure library calls never apply a model. |
+| `explicit`, `manual`, `disabled` | Preserve a local choice without classification. |
+| `requested_role`, `default_only`, `matched` | Direct role/default selection or one valid semantic match. |
+| `no_match`, `ambiguous`, `invalid_response` | Use default fallback after evaluating the classifier response. |
+| `selector_failed`, `selector_timeout`, `selector_unavailable` | Selector transport, deadline, or availability problem. |
+| `input_too_large`, `insufficient_text`, `context_budget` | Skip classification and use default fallback. |
+| `role_unavailable`, `no_usable_model` | Requested role is unusable, or no permitted fallback remains. |
+| `invalid_explicit`, `invalid_request`, `config_invalid` | Caller/configuration contract needs repair. Invalid explicit pins are not silently substituted. |
+| `cancelled`, `stale`, `apply_failed` | Cancellation or interactive application lifecycle outcome. Pure library calls never apply a model. |
 
-Warnings: `effort_clamped`, `roles_unavailable`, `default_unavailable`. No free-form model justification, task, description, raw exception, response, image content, or prompt hash enters a decision. Treat `fallback` and `status` as authoritative; `reason` explains which path occurred. Normal fallback is configured default → inherited baseline → current, deduplicated by exact identity. No arbitrary model is chosen and no task is replayed.
+Warnings are `effort_clamped`, `roles_unavailable`, and `default_unavailable`. Decisions contain no task text, role description, raw exception, classifier response, image content, prompt hash, or free-form model justification. Do not add those to your integration's logs.
 
-## Process-local events
+The ESM root exports `selectModelForTask`, `defaultConfig`, `EFFORTS`, `REASONS`, the versioned event helpers, and their TypeScript contracts. The internal menu/store are not public APIs.
 
-Independently installed Pi packages need not import each other. A primary TUI owner registers **`pi-model-roles:select:v1`** on `pi.events`:
+## Select through Pi events
+
+Use the event contract when packages are installed independently and cannot import each other. The active primary TUI session owns **`pi-model-roles:select:v1`**:
 
 ```ts
+// Inside a Pi extension with access to pi and ctx.
+// SelectionDecision is the type described above.
 const event = {
   version: 1 as const,
   sessionId: ctx.sessionManager.getSessionId(),
   request: { task, current, baseline: current, signal },
   result: undefined as Promise<SelectionDecision> | undefined,
 };
+
 pi.events.emit("pi-model-roles:select:v1", event);
-const decision = await event.result; // Undefined: no matching owner; do not launch.
+const decision = await event.result;
+if (!decision) {
+  // No matching service. Report it; do not silently launch by another path.
+}
 ```
 
-See the complete typed [event client](../examples/selection-client.ts). Imported consumers may use `selectViaEvents(bus, sessionId, request)`, which converts an absent listener to `unavailable/selector_unavailable`.
+If your integration imports the library, `selectViaEvents(bus, sessionId, request)` wraps this contract and converts an absent listener to `unavailable/selector_unavailable`. The [selection client example](../examples/selection-client.ts) shows how to turn a successful library decision into launcher model/thinking fields.
 
-The matching owner validates the request and assigns its **Promise synchronously**. Duplicate owners do not run a second request when `result` is already populated. Wrong session IDs are ignored. Disposal cancels outstanding service results and removes the listener. `registerSelectionService(bus, sessionId, handler)` is also exported for opt-in SDK hosts; it returns the disposer. The handler must itself be bounded/cooperative for resource cleanup, even though disposal settles caller promises.
+Important boundaries:
 
-This is advisory, **not a cross-process transport or security boundary**. Signals and Promises cannot be JSON-serialized into a remote request. The TUI owner uses its configuration/defaults, but does not inherit its manual parent pause into independent child requests: callers must supply child explicit provenance themselves. Parent model/effort is never switched by an event request. Reload replaces the owner; headless and known-child ambient instances register no automatic owner.
+- The matching owner validates the request and assigns the result Promise **synchronously**. Wrong session IDs are ignored; a populated result prevents duplicate owners from starting another request.
+- The owner uses its own configuration and baseline but **does not switch the parent model**. Parent manual pause is not automatically inherited by independent child requests; callers supply the child's explicit choices and pause state.
+- Reload replaces the owner. Disposal cancels outstanding service results and removes its listener. Headless and known-child ambient instances register no automatic owner.
+- `registerSelectionService(bus, sessionId, handler)` lets an opt-in host offer the same service and returns a disposer. The handler must be bounded/cooperative to clean up its own resources.
+- This is advisory and process-local, not a security boundary. Promises and signals cannot be serialized into a remote request.
 
 ## Optional pi-subagents example
 
-[examples/pi-subagents.ts](../examples/pi-subagents.ts) is **not** in `pi.extensions`. Load it explicitly alongside compatible pi-subagents and this package. It registers `/model-roles-delegate-example <task>` and a uniquely named, model-unpinned native demo agent through the public runtime-registration event.
+[examples/pi-subagents.ts](../examples/pi-subagents.ts) demonstrates **select first, then delegate through the existing launcher**. It is not loaded by normal installation, and pi-subagents is not required for interactive model roles.
 
-It selects first, then sends the existing correlated `prompt-template:subagent:request` contract with:
+To try it with compatible **pi-subagents 0.65.1** installed and enabled alongside this package, start Pi with the example explicitly loaded (default user-wide GitHub installation, POSIX shell):
 
-- exact `model: provider + '/' + completeModelId` and separate `thinking`;
-- fresh context, existing native launch preflight/policy, no model-role descriptions in execution prompts;
-- a 25-second native timeout and 30-second result/cancel boundary;
-- no artifacts requested, and no alternative runner or retry on denial/failure.
+```sh
+pi -e "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/git/github.com/spksoft/pi-model-roles/examples/pi-subagents.ts"
+```
 
-It observes the request/owner/node identity on responses and uses the package's cancel protocol. Registration is disposed on shutdown. Missing/incompatible owners are reported, never replaced by another execution mode. The exported `delegateExample` demonstrates optional explicit `{model, effort}` pins; real consumers must resolve their own agent/run defaults first.
+Then run `/model-roles-delegate-example <task>` inside Pi. This launches real work through your configured providers; use a non-sensitive test task and expect normal selection/execution costs.
 
-Tested with **pi-subagents 0.65.1**, credential-free native child execution, embedded-slash model IDs, explicit effort, and parent isolation. Foreground children require their providers to be loaded in their own runtime; they do not inherit all parent extensions. The test fixture provisions its fake provider using pi-subagents' documented path-like tool extension contract and an isolated `PI_SUBAGENTS_TEMP_ROOT`. Known `PI_SUBAGENT_CHILD` ambient copies of this package remain inactive. No claim is made for arbitrary external CLI runners or uninstrumented subagent tools.
+The example registers a uniquely named, model-unpinned native demo agent through the public runtime-registration event. It forwards:
+
+- The exact `provider + '/' + completeModelId` and a separate `thinking` value, preserving slashes inside the ID.
+- Fresh context through the existing correlated `prompt-template:subagent:request` contract, with native preflight and permission policy unchanged.
+- No role descriptions in execution prompts and no requested artifacts.
+- A 25-second native timeout and a 30-second result/cancel boundary, with no alternative runner or retry after denial/failure.
+
+Response identity is correlated by request/owner/node; cancellation uses pi-subagents' protocol. Registrations are disposed on shutdown. Missing/incompatible owners are reported rather than replaced. The exported `delegateExample` also accepts explicit `{model, effort}` pins; production callers must resolve their own agent/run defaults first.
+
+Automated tests cover native fake-provider child execution, exact IDs and effort forwarding, explicit pins, and parent isolation. Foreground children need providers loaded in their own runtime; they do not inherit all parent extensions. Known `PI_SUBAGENT_CHILD` copies of this package remain inactive. This example does not establish compatibility with arbitrary external CLI runners or uninstrumented subagent tools.

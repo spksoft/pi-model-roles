@@ -1,70 +1,138 @@
-# Compatibility and verification
+# Compatibility and troubleshooting
 
-## Supported boundary
+[← README](../README.md) · [Configuration](configuration.md) · [Integration API](api.md)
 
-| Component | Initial verification target |
+Use this page to check whether your Pi setup is covered, diagnose unexpected routing, and understand known limits. Start with the [GitHub installation instructions](../README.md#install-from-github) if the package is not installed yet.
+
+## Requirements and tested versions
+
+| Component | Requirement or tested boundary |
 | --- | --- |
-| Node.js | >=22.19.0; CI uses 22.19.0 |
-| Pi host / AI / TUI peers | `@earendil-works/pi-{coding-agent,ai,tui}` 0.85.1 |
-| Optional native subagent example | `pi-subagents` 0.65.1 |
-| Automatic session | Primary `mode=tui`, new idle interactive non-streaming input |
-| Headless / SDK / children | Explicit library/service integration, no ambient routing or config bootstrap |
-| Distribution | Prebuilt npm tarball; ESM, declarations, no install/postinstall build |
+| Node.js | **22.19.0 or newer**. CI is configured for 22.19.0; local validation has used 22.21.1 on macOS. |
+| Pi | **0.85.1**, using `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, and `@earendil-works/pi-tui`. Other versions are not yet verified. |
+| Provider access | Configure providers/authentication in Pi. There are no bundled models or separate credentials for this package. |
+| GitHub installation | Git, npm, and an explicit source build are required. The repository does not include committed `dist/` files or an automatic install-time build. |
+| Package format | ESM with compiled JavaScript and declarations. Locally built npm tarballs include `dist/` and need no install/postinstall build. |
+| Optional subagent example | **pi-subagents 0.65.1**. Not required for normal use. |
 
-Wildcard Pi peer ranges follow Pi package guidance; **they are not a claim that every Pi version works**. Test additional versions before expanding this matrix. Older package namespaces, external CLI model translation, universal tool interception, and distributed events are unsupported. The package does not modify Pi, pi-subagents, or their permission/launch policy.
+Pi peer dependency ranges are `*` to follow Pi's packaging guidance; **that is not a claim that every Pi version works**. No additional Pi versions, Windows terminal behavior, or live-provider performance is claimed. The package is currently `UNLICENSED`, and no public npm release is assumed.
 
-## Host limits and safe operation
+GitHub install/update/remove syntax follows [Pi's package documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md).
 
-Pi 0.85.1 exposes model changes after asynchronous authentication, but `pi.setModel()` has **no AbortSignal or compare-and-set/generation argument**. Model/effort notifications also do not carry a unique operation ID.
+## Where automatic routing applies
 
-The controller cancels/discards pending classifier results on manual changes, reload, navigation, and shutdown; revalidates before applying; uses expected-value event guards; prevents stale role effort application after an awaited switch; and tries to restore an intervening manual pair in the same active session. Tests verify these cases with delayed switching and non-cooperative classification.
+| Context | Behavior |
+| --- | --- |
+| Primary interactive terminal session, new prompt while idle | Automatic selection, unless paused or globally disabled. |
+| Tools, retries, steering, or already-queued follow-ups | Keep the active model; no independent selection. |
+| Slash-command expansions or extension-generated messages | No independent automatic routing. |
+| Print, JSON, RPC, or headless/SDK hosts | No automatic routing or configuration creation. Integrate through the API explicitly. |
+| Known pi-subagents children | Ambient copies of this extension stay inactive; the launcher selects before launch. |
+| Other subagent tools or external CLI runners | No universal interception or automatic model translation. Require an explicit integration. |
 
-However, an already-in-flight Pi model setter may briefly commit after cancellation. A concurrent session replacement/shutdown, repeated manual changes during repair, or an indistinguishable same-target notification **cannot be made fully atomic with the current public API**. A strict guarantee that every stale switch can never commit remains blocked on an upstream cancellable/CAS setter or operation provenance. No private patch or alternate runner is used to hide this limit. Wait for model switching to finish before changing sessions; reselect your intended model/effort if a switch was interrupted. `selectorTimeoutMs` does not bound Pi's separate model application or worker execution.
+The package uses Pi's cached model availability and capabilities. It does not probe providers on each task, change authentication, or bypass model scope and launcher permissions. Structurally valid roles can remain saved even when their models are temporarily unavailable.
 
-The input gate guarantees at most one selector for an eligible submission handled by this extension. Another extension earlier in the input chain may consume it, or a later extension may consume/transform it after selection. There is no universal ownership/priority mechanism for unrelated extensions. Raw slash expansions are bypassed rather than guessed.
+## Troubleshooting
 
-SDK initial model-choice provenance is not universally available. Unknown headless hosts stay inactive; direct consumers supply explicit pins. Known pi-subagents child identity is captured at extension initialization. Other child hosts must integrate explicitly rather than relying on ambient auto-routing.
+Start with `/model-roles status` for the latest decision, then open `/model-roles` to inspect roles and warnings. A fallback is an expected recovery path, not necessarily an error.
 
-Only configuration structure can be validated without network access. Unknown/withdrawn models remain user data, visibly unavailable; cached registry eligibility is checked at use time. The API/role scope is advisory and does not bypass a launcher's security policy.
+| Symptom | Check or action |
+| --- | --- |
+| `/model-roles` is missing after GitHub installation | Complete the required [build step](../README.md#install-from-github), restart Pi or run `/reload`, and use a primary interactive session. Check `pi list` and `pi config` if the package is missing or disabled. |
+| Extension fails to load after an update | Rebuild the installed checkout. Pi updates may clean generated `dist/` files. Do not rely on an earlier build surviving an update. |
+| No extra request runs | This is normal with only `default`, no eligible custom roles, or bypassed input. Check for a manual pause or global disable. |
+| Routing stopped after you changed models | Manual model/thinking changes pause automation by design. Run `/model-roles auto` to resume on the next eligible prompt. |
+| `/model-roles auto` did not enable routing | It clears the session pause only. Also choose **Enable automatic routing** in the menu if global routing is disabled. |
+| A task used default instead of a custom role | Look for `no_match`, `ambiguous`, unavailable-role warnings, or a selector failure. Make descriptions more specific and avoid overlap. Default fallback is intentional. |
+| Selection is slow or times out | Custom roles add one request to the default model. Check `selector_timeout` in status; adjust `selectorTimeoutMs` within its documented bounds if appropriate. Pausing or removing custom roles avoids that extra request. |
+| Saved roles do not appear in another session | Run `/model-roles reload` there. Configuration has no background watcher. |
+| Role model or effort is unavailable | Configure the provider in Pi or edit the role. The menu shows supported effort levels; older saved values may be clamped with a warning. |
+| Escape restored text but not an image | Selection was cancelled and the task was not run. Reattach the image before submitting again. |
+| YAML cannot be loaded or saved | Follow [configuration recovery](configuration.md#recover-from-a-problem). Do not force an overwrite or delete a lock while another process may be writing. |
 
-## Automated evidence
+Task text beyond 16,384 Unicode characters, blank/image-only input, or an insufficient selector context budget skips classification and uses fallback. See [all limits](configuration.md#advanced-limits-and-safeguards).
 
-The full local gate passed on macOS with **Node 22.21.1**: **27 unit tests and 36 integration tests**, including the production-only tarball and native child tests. CI is configured for the declared 22.19.0 floor; that hosted CI run has not been executed in this session.
+## Model-switch limitation
 
-`npm run check` covers:
+**Wait for a model switch to finish before changing sessions or shutting down.** If you interrupt a switch, check the active model and effort afterward and reselect your intended pair if necessary.
 
-- format/lint and strict TypeScript, including negative public-contract fixtures;
-- YAML schema/Unicode/size/duplicate/tag/alias validation and bounded serialized output;
-- immutable configuration, stale-lock/symlink/permission errors, two-process conflicts, and injected before-write/before-rename/after-rename failures;
-- precedence, exact identity, allowlists, image capability, semantic-output validation, deterministic fallback, Pi-compatible effort mapping, deadlines, independent cancellation, and privacy sentinels;
-- read-only global/project defaults, trust and per-model effort;
-- real Pi SDK initial activation, automatic/manual/reload behavior, invalid configuration, cancellation, headless/child bypass, and queued follow-ups;
-- selected smaller-context model visible before real Pi compaction and subsequent execution, with native fake transport (no real provider/authentication);
-- controller false/throw/effort failures, delayed model application, busy inputs, and manual/reload/tree/shutdown invalidation;
-- native dialog draft cancellation, CRUD, required fields, protected default, manual role use, resume, and reset;
-- session-targeted events, duplicate-owner suppression, cancellation/disposal, and native pi-subagents child model/effort forwarding;
-- offline tarball installation with production dependencies and exact host peers, plain-Node API/extension loading without tsx/TypeScript/pi-subagents, file allowlisting, and YAML retention after executable removal.
+The package cancels pending selection when you change models, reload, navigate, or shut down. It discards stale selector results and checks again before applying model and effort. However, **a Pi model switch that has already started may briefly complete after cancellation**.
 
-All scenarios use synthetic task data and disposable agent roots. Native subagent fixture state has its own `PI_SUBAGENTS_TEMP_ROOT`; no launcher CLI fallback occurs. The SDK fake provider is provisioned through public runtime/extension APIs. The compaction fixture supplies Pi's public custom stream seam for an auth-free fake provider; this is not evidence of live-provider compaction behavior.
+In Pi 0.85.1, `pi.setModel()` does not accept cancellation or a conditional “apply only if this session/state is still current” argument. Model/effort notifications also lack a unique operation ID. The package can guard its own selection and effort application, but cannot make concurrent session replacement, shutdown, or repeated manual changes fully atomic with that public API.
 
-Install dependencies once (`npm ci --ignore-scripts`); ordinary tests use no live providers or credentials. The package smoke test reuses locked versions and npm's offline tarball cache. An empty/missing cache requires dependency provisioning, not a live-provider test.
+`selectorTimeoutMs` only bounds selection, not Pi's separate model application or task execution. No private Pi patch or alternate runner is used to hide this limitation.
 
-Proactive `lsp_diagnostics` and final `lens_diagnostics(mode=all)` found no blocking errors. Pi Lens retains eight nonblocking maintainability advisories (schema/example complexity, explicit Promise bridging in cancellation helpers, and a filesystem fault-test's coordination). Repository lint is clean. Script output, not an absent diagnostics provider, is the compile/test authority.
+## Other extension and host boundaries
 
-## Remaining verification / deviations
+- Another extension earlier in Pi's input chain may consume a prompt before model roles sees it. A later extension may consume or transform it after selection. There is no universal input priority/ownership guarantee across unrelated extensions.
+- Selection runs before Pi's normal model/authentication checks and pre-prompt compaction. Pi still owns conversation conversion, compaction, attachments, and execution.
+- SDK startup model-choice provenance is not universally exposed. Unknown headless hosts stay inactive; direct API callers must supply their own explicit model/effort pins.
+- The event service is process-local and advisory, not an authorization boundary or distributed routing service. See the [API guide](api.md).
 
-- **Human visual TUI acceptance is not claimed.** Keyboard/IME, physical resizing, narrow terminals, and theme rendering need the [manual checklist](../test/manual/tui-checklist.md). Automated tests drive Pi's native dialogs/loaders but cannot attest to every terminal/IME.
-- The strict atomic in-flight switch guarantee above remains a host API limitation; classification races and post-await effort safety are covered, but session-replacement races during an already-started host setter are not represented as solved.
-- The plan's proposed small file modules were consolidated into `core/selection.ts`, `pi/adapters.ts`, `pi/controller.ts`, and `ui/menu.ts` where responsibilities remain cohesive. Public contracts are in `core/types.ts`; no separate runner or provider client was added.
-- Runtime availability warnings are separate from structural YAML errors. This intentionally allows a temporarily unavailable configured role to survive until its provider returns.
-- The pi-subagents package ships source rather than declaration-only imports. Its integration test loads it dynamically as an `ExtensionFactory`, exercises the real public runtime contract, and does not type-check or modify its internal source tree.
-- No real-provider latency, cross-provider service behavior, additional Pi versions, Windows terminal behavior, or public registry publication is claimed.
+## Disable, remove, or return to default
 
-## Rollback
+1. For a temporary stop, run `/model-roles pause`. It keeps the current model and effort.
+2. For a saved global stop, choose **Disable automatic routing** in `/model-roles`. Other sessions need to reload.
+3. To return to default-only routing, delete custom roles individually or back up the YAML and confirm **Reset configuration**. Reset discards custom roles; it does not alter Pi's own defaults.
+4. To remove the extension, let any switch finish, then run this in your shell and restart Pi:
 
-1. `/model-roles pause` preserves this session's current pair. The global **Disable automatic routing** control preserves models without deleting roles.
-2. To remove functionality entirely, disable/remove this package through Pi's package controls, then restart. An in-flight model switch should be allowed to finish first.
-3. The package data directory remains for reinstall. Remove it separately only if you intentionally want to discard role configuration.
-4. Pi's configured defaults/authentication were never changed, so no default-model migration or restoration is necessary. Session model/history entries remain normal Pi history.
+   ```sh
+   pi remove git:github.com/spksoft/pi-model-roles
+   ```
 
-Publication, registry identity, and an actual license selection remain separate owner actions. No commits, public releases, or dependency/package-manager migrations are needed to use the local tarball.
+Removal keeps the role YAML for reinstall. Delete the data separately only if you intentionally want to discard it. Pi's saved model defaults/authentication were not changed by role configuration, so there is no default-model migration to undo. Session model/history entries remain ordinary Pi history.
+
+## Contributor validation
+
+This section is for development, not routine installation. Work in a separate clone rather than Pi's managed package checkout, which updates can reset and clean:
+
+```sh
+git clone https://github.com/spksoft/pi-model-roles.git
+cd pi-model-roles
+npm ci --ignore-scripts
+npm run check
+```
+
+`npm run check` runs:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run format:check` | Check formatting of maintained source/configuration. |
+| `npm run lint` | Run Biome lint. |
+| `npm run typecheck` | Check strict TypeScript, including public-contract fixtures. |
+| `npm test` | Run unit tests, including YAML examples in README/configuration and API reason-code documentation. |
+| `npm run build` | Generate `dist/` JavaScript and declarations. |
+| `npm run test:integration` | Run SDK, storage, UI-flow, event, native subagent, and packed-package tests. |
+
+Use `npm run format` to apply the repository formatter. Before builds, use LSP diagnostics when available; before finishing, check session diagnostics with `lens_diagnostics(mode=all)`. An unavailable diagnostics provider is not a successful type check; script output remains authoritative. Update related user docs for every user-visible change, as required by [AGENTS.md](https://github.com/spksoft/pi-model-roles/blob/main/AGENTS.md).
+
+After building, load a development extension for one run with `pi -e ./dist/extension.js`. Avoid simultaneously enabling an installed copy when checking a development copy. To produce a prebuilt tarball for a standalone API consumer or packaging inspection:
+
+```sh
+npm pack --ignore-scripts
+```
+
+For version 0.1.0 this produces `pi-model-roles-0.1.0.tgz`. It includes compiled code, declarations, examples, and the maintained user guides, with no install/postinstall build. Normal users should follow the [GitHub installation guide](../README.md#install-from-github).
+
+### What automated checks cover
+
+Tests use synthetic data, fake providers, and disposable agent directories—not credentials or live provider access. Dependency installation may need the network. The packed smoke test uses npm's offline cache populated by `npm ci`; a missing cache requires dependency provisioning.
+
+Coverage includes:
+
+- Configuration schema, bounds, safe errors, atomic storage, write failures, and cross-process save conflicts.
+- Model/effort precedence, exact IDs, allowlists, image capabilities, strict classifier output, fallback, timeout, cancellation, and privacy sentinels.
+- Default inheritance and trust-aware reads without rewriting Pi settings.
+- Real Pi SDK lifecycle ordering, manual choices, reload/navigation, delayed model application, queued follow-ups, and headless/child bypass.
+- Smaller-context model selection before Pi compaction using a fake transport; this does not establish live-provider compaction behavior.
+- Native dialog draft cancellation, role management, explicit role use, resume, reset, and session-targeted event isolation/disposal.
+- Native pi-subagents model/effort forwarding and parent isolation, with an isolated `PI_SUBAGENTS_TEMP_ROOT` and no alternative launcher fallback.
+- Prebuilt tarball contents, production-only offline installation, plain-Node library/extension loading without development tooling, and YAML retention after package removal.
+
+The packaging smoke test validates a **locally built tarball**, not a live GitHub fetch or a public registry release. Test results do not prove real-provider latency, cross-provider service behavior, or support for untested Pi versions.
+
+### Manual checks still needed
+
+**Human visual terminal acceptance is not yet claimed.** Automated dialogs/loaders test state and cancellation but do not prove keyboard/IME behavior, physical resizing, narrow terminals, or all themes.
+
+Use the [manual TUI checklist](https://github.com/spksoft/pi-model-roles/blob/main/test/manual/tui-checklist.md) and record the actual environment and results. Do not describe the in-flight model-switch limitation as solved by those checks. The original files under `docs/plan/` are historical design records, not current installation or compatibility guidance.
