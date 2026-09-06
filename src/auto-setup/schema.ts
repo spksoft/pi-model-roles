@@ -15,6 +15,12 @@ const modelRef = Type.Object(
   { provider: text(LIMITS.modelField), id: text(LIMITS.modelField) },
   exact,
 );
+const roleDescription = Type.String({
+  minLength: 1,
+  maxLength: LIMITS.description,
+  description:
+    'Task-selection criteria only: preferably one compact "Use when" sentence with observable scope, uncertainty, risk, modality, or reasoning traits. Must be distinct from other roles and contain no model names, effort, benchmarks, prices, personas, tools, workflows, or execution instructions.',
+});
 const date = Type.String({
   pattern: "^\\d{4}-\\d{2}-\\d{2}$",
   description: "Calendar date in YYYY-MM-DD format.",
@@ -111,7 +117,7 @@ export const autoSetupProposalSchema = Type.Object(
             description:
               "Unique custom role ID; default, constructor, prototype and __proto__ are reserved.",
           }),
-          description: text(LIMITS.description),
+          description: roleDescription,
           ...recommendation,
         },
         exact,

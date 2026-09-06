@@ -5,6 +5,7 @@ import {
   buildRefinementPrompt,
   buildResearchPrompt,
   proposalSubmissionGuidance,
+  roleDesignGuidance,
 } from "../../src/auto-setup/prompt.js";
 import type { AutoSetupDraft } from "../../src/auto-setup/types.js";
 
@@ -30,6 +31,7 @@ test("research prompt preserves exact models and evidence limitations", () => {
   assert.match(prompt, /Do not guess that a gateway alias/);
   assert.match(prompt, /not a sandbox/);
   assert.match(prompt, /no new role is useful/);
+  assertRoleDesignGuidance(prompt);
   assert.match(prompt, /proposal: \{ version: 1, summary, assessments, roles, default\? \}/);
   assertProposalContract(prompt);
   assert.match(prompt, /Do not add schemaVersion, kind, metadata, or routing fields/);
@@ -38,6 +40,16 @@ test("research prompt preserves exact models and evidence limitations", () => {
   assert.match(prompt, /Use no other keys at any level/);
   assert.match(prompt, /generation 2/);
 });
+
+function assertRoleDesignGuidance(prompt: string): void {
+  assert.ok(prompt.includes(roleDesignGuidance));
+  assert.match(prompt, /smallest useful set of roles, not one role per selected model/);
+  assert.match(prompt, /new task text alone/);
+  assert.match(prompt, /overlapping matches fall back to default/);
+  assert.match(prompt, /Good — quick_fix: "Use when/);
+  assert.match(prompt, /one clear match, one near-miss/);
+  assert.match(prompt, /description explains when, rationale explains why this model/);
+}
 
 function assertProposalContract(prompt: string): void {
   assert.ok(
@@ -80,6 +92,8 @@ test("refinement prompt carries the same typed contract and correction guidance"
     question: "Would any new role be useful?",
   });
   assertProposalContract(prompt);
+  assertRoleDesignGuidance(prompt);
+  assert.match(prompt, /Re-evaluate the complete role portfolio/);
   assert.match(prompt, /generation 3/);
   assert.match(prompt, /prior reviewed draft stays available/);
   assert.ok(prompt.includes(JSON.stringify(draft.proposal)));

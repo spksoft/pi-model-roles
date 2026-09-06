@@ -112,6 +112,9 @@ test("Auto Setup accepts a mixed per-model evidence report", () => {
 test("tool schema exposes bounded caveat arrays and accepts the full optional contract", () => {
   const schema = autoSetupSubmissionSchema.properties.proposal;
   const caveats = schema.properties.assessments.items.properties.caveats;
+  const roleDescription = schema.properties.roles.items.properties.description;
+  assert.match(Reflect.get(roleDescription, "description"), /Task-selection criteria only/);
+  assert.match(Reflect.get(roleDescription, "description"), /distinct from other roles/);
   assert.equal(caveats.type, "array");
   assert.equal(caveats.items.type, "string");
   assert.equal(Reflect.get(caveats, "maxItems"), AUTO_SETUP_LIMITS.caveatsPerCandidate);

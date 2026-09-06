@@ -25,7 +25,7 @@ Auto Setup is a primary-TUI workflow for researching **one to eight** cached ava
 
 1. Run `/model-roles auto-setup` or select **Auto Setup** in the menu, then choose models with Space and continue with Enter.
 2. Read and confirm the disclosure. Research uses the **current Pi model** without switching it. The model receives its normal Pi conversation/provider flow and may use the tools you already configured. Tool providers can make requests, charge, or retain data under their own policies. Auto Setup does not sandbox them.
-3. The normal agent should research first-party material for every exact selected provider/model ID and submit a structured report. It may instead report that no official evidence was found, that it used offline knowledge, or that a serving-model identity could not be resolved. A source URL is agent-reported and user-reviewable, not independently verified by this package. Offline knowledge means no web evidence was collected; it is not a local model run.
+3. The normal agent should research first-party material for every exact selected provider/model ID and submit a structured report. The prompt asks it to recommend the smallest useful role set, write criteria decidable from the submitted task alone, avoid execution instructions and model claims in descriptions, and check every pair for overlap. Good/bad few-shot descriptions demonstrate these boundaries. It may instead report that no official evidence was found, that it used offline knowledge, or that a serving-model identity could not be resolved. A source URL is agent-reported and user-reviewable, not independently verified by this package. Offline knowledge means no web evidence was collected; it is not a local model run.
 4. When Pi reports the proposal settled, run `/model-roles auto-setup review`. Inspect per-model evidence state, dates, benchmark conditions/caveats, recommendations and the exact role diff. **Discuss/refine** sends a new guarded normal-agent message. Ordinary chat is not captured as Auto Setup discussion.
 5. Choose whether to keep conflicts, replace individual conflicting roles, or replace all custom roles after a destructive confirmation. Confirm the final diff. Research and discussion alone never write `config.yaml`.
 
@@ -45,8 +45,10 @@ Pausing is session-specific; disabling is a saved global setting. `/model-roles 
 
 A description tells the selector **when the role applies**, not how to perform the task.
 
-- Prefer a narrow criterion: “Use for small documentation corrections with no code changes.”
+- Prefer a compact `Use when …` criterion based on task-visible scope, uncertainty, risk, modality, or reasoning needs: “Use when the request is a localized, low-risk documentation correction with no code changes.”
+- Give each role a clear match, a near-miss, and tasks that belong to another role. If boundaries remain ambiguous, combine or remove roles rather than forcing coverage.
 - Avoid broad overlaps such as “Use for coding” and “Use for programming.” Multiple matches use `default`, not the first role in the list.
+- Keep model/provider names, speed, price, benchmark claims, and reasoning effort out of descriptions; those justify the assignment rather than define the task.
 - Put execution instructions such as “Run the tests before finishing” in your prompt or `AGENTS.md`, not in a role description.
 - Choose models already available in Pi. The package does not configure providers, authenticate accounts, or measure which model is best.
 
