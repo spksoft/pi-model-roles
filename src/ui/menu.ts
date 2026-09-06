@@ -8,6 +8,7 @@ import type { RolesController } from "../pi/controller.js";
 import { reviewAutoSetup, startAutoSetup } from "./auto-setup.js";
 import { confirmFirstCustomRoleRouting, saveRoleConfig } from "./config-save.js";
 import { showRoleDashboard } from "./role-dashboard.js";
+import { selectModel } from "./model-picker.js";
 
 export function roleSummary(id: string, role: DefaultRole): string {
   return `${id} · ${role.model === "inherit" ? "Pi default" : displayModel(role.model)} · ${role.effort}`;
@@ -53,22 +54,15 @@ async function editRole(
     }
   }
   const models = availableModels(ctx);
-  const inherited = "Use Pi default model";
-  const labels = models.map((model) => displayModel(model.ref));
-  if (id === "default") labels.unshift(inherited);
-  if (!labels.length) {
+  if (!models.length && id !== "default") {
     ctx.ui.notify("No models are available. Configure a provider in Pi first.", "warning");
     return;
   }
-  const choice = await ctx.ui.select(
-    `${editing ? "Edit" : "Create"} role — step 3 of 4: choose a model`,
-    labels,
-  );
-  if (!choice) return;
-  const model =
-    choice === inherited
-      ? "inherit"
-      : models.find((item) => displayModel(item.ref) === choice)?.ref;
+  const model = await selectModel(ctx.ui, models, {
+    title: `${editing ? "Edit" : "Create"} role — step 3 of 4: choose a model`,
+    allowInherit: id === "default",
+    current: old?.model,
+  });
   if (!model) return;
   const resolved = model === "inherit" ? controller.baseline.model : model;
   const capabilities = models.find((item) => sameModel(item.ref, resolved));

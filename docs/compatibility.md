@@ -48,6 +48,7 @@ Start with `/model-roles status` for the latest decision, then open `/model-role
 | --- | --- |
 | `/model-roles` is missing after GitHub installation | Restart Pi or run `/reload`, then use a primary interactive session. Check `pi list` and `pi config` if the package is missing or disabled. |
 | Extension fails to load after an update | Restart Pi or run `/reload`. If it remains unavailable, run `pi update git:github.com/spksoft/pi-model-roles`, then check `pi list` and `pi config`. |
+| Role model picker still shows the whole catalog after updating | Run `pi update git:github.com/spksoft/pi-model-roles` in your shell, then restart Pi or run `/reload` and reopen `/model-roles settings`. All model pickers now show at most eight rows with type-to-search. `/model-roles reload` only reloads configuration, not extension code. Check `pi list`/`pi config` for a duplicate older copy if it persists. |
 | No extra request runs | This is normal with only `default`, no eligible custom roles, or bypassed input. Check for a manual pause or global disable. |
 | Routing stopped after you changed models | Manual model/thinking changes pause automation by design. Run `/model-roles auto` to resume on the next eligible prompt. |
 | `/model-roles auto` did not enable routing | It clears the session pause only. Also choose **Enable automatic routing** in the menu if global routing is disabled. |
@@ -139,6 +140,7 @@ Coverage includes:
 - Real Pi SDK lifecycle ordering, manual choices, reload/navigation, delayed model application, queued follow-ups, and headless/child bypass.
 - Smaller-context model selection before Pi compaction using a fake transport; this does not establish live-provider compaction behavior.
 - Native dialog draft cancellation, role management, explicit role use, resume, reset, and session-targeted event isolation/disposal.
+- Real component keyboard input through SDK role creation/edit/default flows with a large three-provider fake catalog; shared picker pagination, fuzzy queries, exact refs, inherited default, multi-selection persistence, terminal-size render bounds, and focus forwarding.
 - Native pi-subagents model/effort forwarding and parent isolation, with an isolated `PI_SUBAGENTS_TEMP_ROOT` and no alternative launcher fallback.
 - Prebuilt tarball contents, production-only offline installation, plain-Node library/extension loading without development tooling, and YAML retention after package removal.
 

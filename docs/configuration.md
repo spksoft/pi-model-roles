@@ -19,11 +19,23 @@ For most users, **`/model-roles` is the only configuration tool needed**. Use it
 
 The dashboard labels session pause and global enablement separately, so a session-only pause is not confused with the saved global setting. The default role cannot be deleted or renamed. Role edits remain drafts until confirmed, and cancelling leaves the model and file unchanged. Saving a role does not immediately switch the execution model; **U** does.
 
+### Model picker controls
+
+Role creation, custom-role editing, default-role editing, and Auto Setup share the same Pi-style picker. It displays **at most eight models per page**, reduces that count on short terminals, and truncates long labels to the terminal's display width. The search field is active immediately—no `/` or Ctrl+F activation is needed.
+
+- Type a partial provider/model ID to fuzzy-filter and rank matches. Slash-separated terms work too, such as `openrouter/sonnet`. Filtering resets to the first page; it never changes stored model identities.
+- Use **↑/↓** to move (wrapping at the ends), **PgUp/PgDn** to change pages, **Backspace** to edit the query, and **Ctrl+U** to clear it. Pi's configured `tui.select.*` bindings are honored.
+- **Enter** selects the highlighted model when editing a role. The existing assignment is initially highlighted when available. Only default-role editing offers the searchable **Use Pi default model** option.
+- In Auto Setup, **Space** or **Tab** toggles the highlighted model; **Enter** continues with the checked models. Up to eight may be checked across searches/pages. Use slash-separated search terms since Space toggles a candidate here.
+- **Escape** or **Ctrl+C** cancels immediately, even with a query. There is no separate search mode: `j`, `k`, `H`, `L`, and `/` are search text, not navigation shortcuts. Dashboard `j`/`k` navigation is unchanged.
+
+The picker uses cached available models within Pi's current scope. It does not refresh providers, make network requests, switch the active model, or save roles until the normal confirmation flow completes. No new configuration setting is required.
+
 ## Auto Setup
 
 Auto Setup is a primary-TUI workflow for researching **one to eight** cached available models and proposing ordinary role changes. It has no YAML settings and does not configure providers, credentials, search services, or Pi's tool permissions.
 
-1. Run `/model-roles auto-setup` or select **Auto Setup** in the menu, then choose models with Space and continue with Enter. The picker shows eight models per page; use `/` or Ctrl+F to fuzzy-search and PgUp/PgDn (or H/L) to change pages. Escape clears an active search; a second Escape cancels.
+1. Run `/model-roles auto-setup` or select **Auto Setup** in the menu, then choose models with Space or Tab and continue with Enter. Use the shared [model picker controls](#model-picker-controls) to search and navigate pages. Escape cancels immediately.
 2. Read and confirm the disclosure. Research uses the **current Pi model** without switching it. The model receives its normal Pi conversation/provider flow and may use the tools you already configured. Tool providers can make requests, charge, or retain data under their own policies. Auto Setup does not sandbox them.
 3. The normal agent should research first-party material for every exact selected provider/model ID and submit a structured report. The prompt asks it to recommend the smallest useful role set, write criteria decidable from the submitted task alone, avoid execution instructions and model claims in descriptions, and check every pair for overlap. Good/bad few-shot descriptions demonstrate these boundaries. It may instead report that no official evidence was found, that it used offline knowledge, or that a serving-model identity could not be resolved. A source URL is agent-reported and user-reviewable, not independently verified by this package. Offline knowledge means no web evidence was collected; it is not a local model run.
 4. When Pi reports the proposal settled, run `/model-roles auto-setup review`. Inspect per-model evidence state, dates, benchmark conditions/caveats, recommendations and the exact role diff. **Discuss/refine** sends a new guarded normal-agent message. Ordinary chat is not captured as Auto Setup discussion.
@@ -129,7 +141,7 @@ Effort values are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`.
 
 If a saved effort is no longer supported, normal role selection uses Pi's clamping rule: choose the next supported higher level, otherwise a lower level. Status reports `effort_clamped` and the requested/effective values. Explicit API effort pins are rejected rather than silently clamped.
 
-Provider and model IDs are separate, exact identifiers. Each must be nonempty, whitespace-trimmed, at most 512 UTF-16 code units, and contain no ASCII control characters. Model IDs may contain slashes. There is no fuzzy name matching.
+Provider and model IDs are separate, exact identifiers. Each must be nonempty, whitespace-trimmed, at most 512 UTF-16 code units, and contain no ASCII control characters. Model IDs may contain slashes. Routing and saved configuration use exact identity, not fuzzy name matching; fuzzy search is only a picker convenience.
 
 This file does **not** configure provider endpoints, credentials, tools, permissions, execution instructions, or a separate selector-effort profile. Unknown fields are rejected.
 

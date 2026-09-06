@@ -29,7 +29,7 @@ test("multi-select caps selection at eight and returns cloned exact refs", () =>
   );
   for (let index = 0; index < 9; index++) {
     component.handleInput(" ");
-    component.handleInput("j");
+    component.handleInput("\u001b[B");
   }
   assert.equal(component.values().length, 8);
   component.handleInput("\r");
@@ -45,12 +45,19 @@ test("multi-select fuzzy search filters the list and keeps selections by exact m
     theme,
     () => undefined,
   );
-  component.handleInput("/");
   component.handleInput("8");
   assert.match(component.render(80).join("\n"), /model-8/);
   assert.doesNotMatch(component.render(80).join("\n"), /model-7/);
   component.handleInput(" ");
   assert.deepEqual(component.values(), [{ provider: "fixture", id: "model-8" }]);
+  component.handleInput("\u0015"); // Clear query; selection survives.
+  component.handleInput("0");
+  component.handleInput("\t");
+  assert.deepEqual(component.values(), [models[0]?.ref, models[8]?.ref]);
+  component.handleInput("\u0015");
+  component.handleInput("8");
+  component.handleInput(" ");
+  assert.deepEqual(component.values(), [models[0]?.ref]);
 });
 
 test("multi-select renders one fixed-size page and supports page navigation", () => {
@@ -67,12 +74,12 @@ test("multi-select renders one fixed-size page and supports page navigation", ()
     () => undefined,
   );
   const firstPage = component.render(80).join("\n");
-  assert.match(firstPage, /Page 1\/3 · 1–8 of 17/);
+  assert.match(firstPage, /Page 1\/3 · 17 matches/);
   assert.match(firstPage, /page-model-7/);
   assert.doesNotMatch(firstPage, /page-model-8/);
   component.handleInput("\u001b[6~");
   const secondPage = component.render(80).join("\n");
-  assert.match(secondPage, /Page 2\/3 · 9–16 of 17/);
+  assert.match(secondPage, /Page 2\/3 · 17 matches/);
   assert.match(secondPage, /page-model-8/);
   assert.doesNotMatch(secondPage, /page-model-16/);
 });

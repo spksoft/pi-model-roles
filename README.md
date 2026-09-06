@@ -34,7 +34,7 @@ You can select `default` → **Edit** to choose a different model or effort for 
 
 1. Open `/model-roles` and press **A** to add a role.
 2. Enter a short identifier, such as `quick`, then describe **when Pi should choose it**—for example: “Use for small, well-specified edits that do not require design decisions.”
-3. Choose an available model and a supported reasoning effort. Models without reasoning use `off`.
+3. Choose an available model and a supported reasoning effort. **All model pickers—including role edits and `default`—show at most eight models per page** (fewer on short terminals). Type immediately to fuzzy-search provider/model IDs, use arrows and PgUp/PgDn to navigate, then Enter to select. Ctrl+U clears the query; Escape cancels. Models without reasoning use `off`.
 4. Review and confirm the save. The first custom-role save also explains the extra request, cost, and provider data flow.
 
 Possible role descriptions—not built-in presets:
@@ -94,7 +94,7 @@ The role manager shows global and session routing separately. Press **P** to pau
 
 ## Auto Setup
 
-**Auto Setup is optional and confirmation-first.** In a primary TUI session, choose **Auto Setup** from `/model-roles` or run `/model-roles auto-setup`, select one to eight currently available models, then confirm that the **currently active Pi model** may perform a normal agent research turn. The model picker shows eight candidates per page; press `/` (or Ctrl+F) to fuzzy-search, PgUp/PgDn (or H/L) to change pages, and Escape to clear a search or cancel. Auto Setup never switches that model or its thinking level.
+**Auto Setup is optional and confirmation-first.** In a primary TUI session, choose **Auto Setup** from `/model-roles` or run `/model-roles auto-setup`, select one to eight currently available models, then confirm that the **currently active Pi model** may perform a normal agent research turn. It uses the same paginated, type-to-search model picker as role editing; Space or Tab toggles candidates, Enter continues, and Escape cancels. Selections survive searches and page changes. Auto Setup never switches that model or its thinking level.
 
 The active agent may use whichever tools you have configured. It should search first-party provider material for each exact selected model and submit a report with agent-reported source URLs, dates, benchmark conditions, caveats, and role recommendations. The research and refinement prompts include a role-design rubric, good/bad few-shot descriptions, and an overlap self-check so recommendations remain small, task-observable, and distinct instead of creating one vague role per model. The handoff tool exposes a typed, bounded proposal schema, and the prompts explain the required field shapes. Unknown fields are rejected. If validation fails, the agent is instructed to correct the report and retry once rather than abandon it because of a single-call restriction. Source URLs are **not independently verified** by this package; a report can mix first-party citations, no-official-evidence-found, offline knowledge, and unresolved model identity. Offline knowledge means no web evidence was collected—it is not a local/offline model run and still uses your active model provider's normal data flow.
 
