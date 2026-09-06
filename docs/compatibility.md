@@ -1,8 +1,8 @@
 # Compatibility and troubleshooting
 
-[← README](../README.md) · [Configuration](configuration.md) · [Integration API](api.md)
+[← README](../README.md) · [Architecture](architecture.md) · [Configuration](configuration.md) · [Integration API](api.md)
 
-Use this page to check whether your Pi setup is covered, diagnose unexpected routing, and understand known limits. Start with the [GitHub installation instructions](../README.md#install-from-github) if the package is not installed yet.
+This is the detailed support and troubleshooting guide. Use this page to check whether your Pi setup is covered, diagnose unexpected routing, and understand known limits. Start with the [GitHub installation instructions](../README.md#install-from-github) if the package is not installed yet.
 
 ## Requirements and tested versions
 

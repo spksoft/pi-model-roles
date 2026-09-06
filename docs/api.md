@@ -1,8 +1,8 @@
 # Integrate model selection
 
-[← README](../README.md) · [Configuration](configuration.md) · [Compatibility](compatibility.md)
+[← README](../README.md) · [Architecture](architecture.md) · [Configuration](configuration.md) · [Compatibility](compatibility.md)
 
-This guide is for extension and SDK authors. **Regular Pi users only need `/model-roles`.** Installing this package does not automatically route other packages' subagents or headless tasks.
+This is the detailed API guide for extension and SDK authors. For the routing design before integrating it, see [Architecture and routing flow](architecture.md). **Regular Pi users only need `/model-roles`.** Installing this package does not automatically route other packages' subagents or headless tasks.
 
 The API answers one question: **which model and thinking effort should handle this task?** It returns a decision. Your integration still applies the model, prepares context, checks permissions, and runs the task through its existing execution path.
 

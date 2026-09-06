@@ -1,6 +1,6 @@
 # Manual terminal acceptance checklist
 
-[← README](../../README.md) · [Compatibility and known limits](../../docs/compatibility.md)
+[← README](../../README.md) · [Architecture](../../docs/architecture.md) · [Compatibility and known limits](../../docs/compatibility.md)
 
 **Status: not yet human-verified.** This is a maintainer checklist, not a setup requirement for users. Automated fake-UI/SDK tests cover workflow state and cancellation; they do not establish visual, keyboard, or IME behavior. Check a box only after performing that test.
 

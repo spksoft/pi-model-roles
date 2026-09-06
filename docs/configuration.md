@@ -1,6 +1,8 @@
 # Configure model roles
 
-[← README](../README.md) · [Compatibility and troubleshooting](compatibility.md) · [Integration API](api.md)
+[← README](../README.md) · [Architecture](architecture.md) · [Compatibility and troubleshooting](compatibility.md) · [Integration API](api.md)
+
+This is the detailed configuration guide. For the high-level routing design, see [Architecture and routing flow](architecture.md).
 
 For most users, **`/model-roles settings`** is the only configuration UI needed. Use it for Auto Setup and role CRUD; use `/model-roles enable`, `/model-roles disable`, and `/model-roles use <role>` for runtime selection. You do not need to write YAML or look up provider IDs by hand.
 
