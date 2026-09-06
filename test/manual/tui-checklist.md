@@ -7,12 +7,12 @@
 ## Prepare a safe test session
 
 1. Use Pi **0.85.1** and Node.js **22.19.0 or newer**. Record the exact Pi/Node/OS/terminal versions.
-2. Build a separate development clone with `npm ci --ignore-scripts` and `npm run build`. Do not edit Pi's managed GitHub checkout for development.
-3. Use a new, disposable `PI_CODING_AGENT_DIR`, not your normal agent directory. From the development clone, start Pi with that directory and `-e ./dist/extension.js`; avoid loading a second installed copy.
+2. Prepare a separate development clone with `npm ci --ignore-scripts`. Do not edit Pi's managed GitHub checkout for development.
+3. Use a new, disposable `PI_CODING_AGENT_DIR`, not your normal agent directory. From the development clone, start Pi with that directory and `-e ./src/extension.ts`; avoid loading a second installed copy.
 4. Use synthetic task text, role descriptions, and image attachments. Configure a fake provider for offline routing checks. If no test provider is available, mark provider-dependent checks **not run**, not passed. Use live accounts only with separate approval.
 5. Prepare terminal widths of 40, 80, and 120 columns and light/dark themes. Include multiline non-English input and an input method editor (IME).
 
-The separate [GitHub installation flow](../../README.md#install-from-github) requires a build after install and update. Test that flow in a disposable agent directory when validating installation changes; do not claim a live GitHub install was checked merely because local extension loading worked.
+The separate [GitHub installation flow](../../README.md#install-from-github) must expose `/model-roles` after install or update without a manual build. Test that flow in a disposable agent directory when validating installation changes; do not claim a live GitHub install was checked merely because local extension loading worked.
 
 ## First use and role management
 

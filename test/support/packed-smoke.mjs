@@ -4,7 +4,20 @@ import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { defaultConfig, selectModelForTask } from "pi-model-roles";
 import extension from "./node_modules/pi-model-roles/dist/extension.js";
-import { createEventBus } from "@earendil-works/pi-coding-agent";
+import { createEventBus, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+const sourceLoader = new DefaultResourceLoader({
+  cwd: process.cwd(),
+  agentDir: process.env.PI_CODING_AGENT_DIR,
+  additionalExtensionPaths: ["./node_modules/pi-model-roles/src/extension.ts"],
+  noExtensions: true,
+  noSkills: true,
+  noThemes: true,
+  noPromptTemplates: true,
+  noContextFiles: true,
+});
+await sourceLoader.reload();
+assert.deepEqual(sourceLoader.getExtensions().errors, []);
+assert.equal(sourceLoader.getExtensions().extensions.length, 1);
 const handlers = new Map();
 const commands = new Map();
 const model = { provider: "fixture", id: "default" };

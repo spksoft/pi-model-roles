@@ -11,7 +11,7 @@ Use this page to check whether your Pi setup is covered, diagnose unexpected rou
 | Node.js | **22.19.0 or newer**. CI is configured for 22.19.0; local validation has used 22.21.1 on macOS. |
 | Pi | **0.85.1**, using `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, and `@earendil-works/pi-tui`. Other versions are not yet verified. |
 | Provider access | Configure providers/authentication in Pi. There are no bundled models or separate credentials for this package. |
-| GitHub installation | Git, npm, and an explicit source build are required. The repository does not include committed `dist/` files or an automatic install-time build. |
+| GitHub installation | Git and npm are required. Pi loads the extension directly from the repository's TypeScript source, so no manual build is required. |
 | Package format | ESM with compiled JavaScript and declarations. Locally built npm tarballs include `dist/` and need no install/postinstall build. |
 | Optional subagent example | **pi-subagents 0.65.1**. Not required for normal use. |
 
@@ -46,8 +46,8 @@ Start with `/model-roles status` for the latest decision, then open `/model-role
 
 | Symptom | Check or action |
 | --- | --- |
-| `/model-roles` is missing after GitHub installation | Complete the required [build step](../README.md#install-from-github), restart Pi or run `/reload`, and use a primary interactive session. Check `pi list` and `pi config` if the package is missing or disabled. |
-| Extension fails to load after an update | Rebuild the installed checkout. Pi updates may clean generated `dist/` files. Do not rely on an earlier build surviving an update. |
+| `/model-roles` is missing after GitHub installation | Restart Pi or run `/reload`, then use a primary interactive session. Check `pi list` and `pi config` if the package is missing or disabled. |
+| Extension fails to load after an update | Restart Pi or run `/reload`. If it remains unavailable, run `pi update git:github.com/spksoft/pi-model-roles`, then check `pi list` and `pi config`. |
 | No extra request runs | This is normal with only `default`, no eligible custom roles, or bypassed input. Check for a manual pause or global disable. |
 | Routing stopped after you changed models | Manual model/thinking changes pause automation by design. Run `/model-roles auto` to resume on the next eligible prompt. |
 | `/model-roles auto` did not enable routing | It clears the session pause only. Also choose **Enable automatic routing** in the menu if global routing is disabled. |

@@ -14,19 +14,7 @@ You need **Pi**, **Node.js 22.19.0 or newer**, **npm**, and **Git**. The tested 
    pi install git:github.com/spksoft/pi-model-roles
    ```
 
-2. Build the installed source checkout. **This step is currently required:** the repository does not commit `dist/`, and installation does not build it automatically.
-
-   ```sh
-   (
-     cd "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/git/github.com/spksoft/pi-model-roles" &&
-     npm ci --ignore-scripts &&
-     npm run build
-   )
-   ```
-
-   These are POSIX-shell commands for a default user-wide installation. If you use Pi's project-local `-l` installation, build in `.pi/git/github.com/spksoft/pi-model-roles` instead. `PI_CODING_AGENT_DIR` is respected when set.
-
-3. Start or restart Pi, or run `/reload` in an open session. Then enter:
+2. Start or restart Pi, or run `/reload` in an open session. Then enter:
 
    ```text
    /model-roles
@@ -161,7 +149,7 @@ Update the GitHub installation from your shell:
 pi update git:github.com/spksoft/pi-model-roles
 ```
 
-**Repeat the build step from [installation](#install-from-github) after each update**, then restart Pi or run `/reload`. Pi may clean generated files when updating its managed checkout. Do not keep personal edits or configuration there.
+Restart Pi or run `/reload` after each update. Pi loads the extension directly from the package's TypeScript source, so no manual build is required. Do not keep personal edits or configuration in Pi's managed checkout.
 
 To remove the package:
 

@@ -26,10 +26,11 @@ test("prebuilt tarball loads without devDependencies and keeps configuration on 
     assert.ok(files.includes("dist/index.js"));
     assert.ok(files.includes("dist/index.d.ts"));
     assert.ok(files.includes("dist/extension.js"));
+    assert.ok(files.includes("src/extension.ts"));
     assert.equal(
       files.some(
         (file) =>
-          /^(test|src|docs\/plan|node_modules)\//.test(file) || /config\.yaml|\.lock$/.test(file),
+          /^(test|docs\/plan|node_modules)\//.test(file) || /config\.yaml|\.lock$/.test(file),
       ),
       false,
     );
@@ -58,7 +59,7 @@ test("prebuilt tarball loads without devDependencies and keeps configuration on 
     ) as { scripts: Record<string, string>; pi: { extensions: string[] } };
     assert.equal(installed.scripts.install, undefined);
     assert.equal(installed.scripts.postinstall, undefined);
-    assert.deepEqual(installed.pi.extensions, ["./dist/extension.js"]);
+    assert.deepEqual(installed.pi.extensions, ["./src/extension.ts"]);
     await copyFile(resolve("test/support/packed-smoke.mjs"), join(dir, "smoke.mjs"));
     const result = await exec(process.execPath, ["smoke.mjs"], {
       cwd: dir,

@@ -18,11 +18,12 @@
   },
   "pi": {
     "extensions": [
-      "./dist/extension.js"
+      "./src/extension.ts"
     ]
   },
   "files": [
     "dist",
+    "src",
     "examples",
     "README.md",
     "CHANGELOG.md",

@@ -26,8 +26,9 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ### Integrations and documentation
 
+- Load the Pi extension from packaged TypeScript source so GitHub installation and updates work without a manual build step; keep compiled `dist/` output for standalone API consumers.
 - Provide a non-mutating selection API and session-targeted event service for explicit integrations. Include an optional native pi-subagents example; do not automatically intercept other launchers.
-- Document installation from [github.com/spksoft/pi-model-roles](https://github.com/spksoft/pi-model-roles), including the currently required source build after install/update.
+- Document installation from [github.com/spksoft/pi-model-roles](https://github.com/spksoft/pi-model-roles) with no post-install build step.
 - Organize guides around getting started, how selection works, configuration, troubleshooting, and integration. Add contributor guidance to keep related user documentation updated with user-visible changes.
 - Include credential-free unit/integration/package checks and a [manual terminal checklist](https://github.com/spksoft/pi-model-roles/blob/main/test/manual/tui-checklist.md).
 
