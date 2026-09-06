@@ -48,6 +48,14 @@ function offlineProposal() {
   };
 }
 
+async function waitFor(condition: () => boolean, failure: string): Promise<void> {
+  const deadline = Date.now() + 1_000;
+  while (!condition()) {
+    if (Date.now() >= deadline) assert.fail(failure);
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 async function submitResearch(
   h: Awaited<ReturnType<typeof sdkHarness>>,
   reviewAnswers: Array<string | boolean> = [],
@@ -71,13 +79,16 @@ async function submitResearch(
   );
   await h.session.prompt("/model-roles settings");
   await h.session.waitForIdle();
-  await new Promise<void>((resolve) => setTimeout(resolve, 10));
 }
 
 test("confirmed Auto Setup save preserves the active model and writes only the reviewed role diff", async () => {
   const h = await sdkHarness();
   try {
     await submitResearch(h, ["Confirm settings", true, true]);
+    await waitFor(
+      () => h.ui.notifications.some((message) => message.includes("Model roles saved.")),
+      "Auto Setup did not finish saving the confirmed role changes.",
+    );
     const snapshot = await new ConfigStore(h.dir).load(false);
     assert.ok(snapshot);
     const quick = snapshot.config.roles.quick;
@@ -123,9 +134,13 @@ test("Auto Setup automatically reviews both research and a refined proposal", as
     );
 
     await h.session.prompt("/model-roles settings");
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
     await h.session.waitForIdle();
-    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    await waitFor(
+      () =>
+        h.faux.state.callCount === 4 &&
+        h.ui.selections.filter((item) => item.title === "Auto Setup proposal").length === 2,
+      "Auto Setup did not finish the automatic review of the refined proposal.",
+    );
 
     assert.equal(
       h.faux.state.callCount,
@@ -147,6 +162,10 @@ test("automatic Auto Setup review can cancel without a separate review command o
   const h = await sdkHarness();
   try {
     await submitResearch(h, ["Cancel proposal"]);
+    await waitFor(
+      () => h.ui.notifications.some((message) => message.includes("Auto Setup cancelled")),
+      "Auto Setup did not finish cancelling the reviewed proposal.",
+    );
     const store = new ConfigStore(h.dir);
     const snapshot = await store.load(false);
     assert.ok(snapshot);
