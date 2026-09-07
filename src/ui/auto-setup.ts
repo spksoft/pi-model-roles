@@ -1,5 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { mergeProposal } from "../auto-setup/merge.js";
+import { autoSetupConfigDiff, autoSetupReport } from "../auto-setup/report.js";
 import type { AutoSetupDraft, MergeChoice } from "../auto-setup/types.js";
 import { displayModel, sameModel } from "../core/model-identity.js";
 import type { RoleConfig } from "../core/types.js";
@@ -8,29 +9,6 @@ import type { AutoSetupController } from "../pi/auto-setup-controller.js";
 import type { RolesController } from "../pi/controller.js";
 import { confirmFirstCustomRoleRouting, saveRoleConfig } from "./config-save.js";
 import { selectModels } from "./model-multi-select.js";
-
-function report(draft: AutoSetupDraft): string {
-  const assessments = draft.proposal.assessments.map((assessment) => {
-    const sources = assessment.sources.length
-      ? assessment.sources
-          .map((source) => `  - ${source.title}: ${source.url} (accessed ${source.accessedAt})`)
-          .join("\n")
-      : "  - No source URL reported.";
-    const caveats = assessment.caveats.length
-      ? `\n  Caveats: ${assessment.caveats.join("; ")}`
-      : "";
-    return `${displayModel(assessment.model)} — ${assessment.status}\n  ${assessment.summary}\n${sources}${caveats}`;
-  });
-  const roles = draft.proposal.roles.length
-    ? draft.proposal.roles
-        .map(
-          (role) =>
-            `${role.id}: ${displayModel(role.model)} · ${role.effort}\n  ${role.description}\n  Why: ${role.rationale}\n  Uncertainty: ${role.uncertainty}`,
-        )
-        .join("\n")
-    : "No new custom roles recommended.";
-  return `Auto Setup report — agent-reported sources are not independently verified.\nResearch model: ${displayModel(draft.researchModel)}\nReceived: ${draft.receivedAt}\n\n${draft.proposal.summary}\n\nEvidence\n${assessments.join("\n\n")}\n\nRecommended roles\n${roles}`;
-}
 
 function changedAssignmentsAvailable(
   ctx: ExtensionContext,
@@ -128,10 +106,7 @@ async function applyDraft(
     );
     return;
   }
-  const changeText = merged.changes
-    .filter((change) => change.kind !== "unchanged")
-    .map((change) => `${change.kind}: ${change.id}`)
-    .join("\n");
+  const changeText = autoSetupConfigDiff(snapshot.config, merged.config);
   if (choice.mode === "replace-custom") {
     if (
       !(await ctx.ui.confirm(
@@ -189,7 +164,7 @@ export async function startAutoSetup(
   if (
     !(await ctx.ui.confirm(
       "Start Auto Setup research?",
-      `Research uses the current Pi model (${current}) and its normal conversation/provider data flow. Configured tools may make web requests, incur their own costs, and retain data under their policies. This package does not add credentials, change tool permissions, or sandbox the normal agent. If web research is unavailable, the agent may use explicitly labelled offline knowledge. Research consent is separate from future task-routing charges and configuration saving.`,
+      `Research uses the current Pi model (${current}) and its normal conversation/provider data flow. The generated prompt includes selected model capabilities and your current role descriptions, assignments, enabled state, and selector timeout for comparison; do not keep secrets in role descriptions. Research guidance tells the agent to use only public model identities in searches, but is not an enforcement boundary. Configured tools may make web requests, incur their own costs, and retain data under their policies. This package does not add credentials, change tool permissions, or sandbox the normal agent. If web research is unavailable, the agent may use explicitly labelled offline knowledge. Research consent is separate from future task-routing charges and configuration saving.`,
     ))
   )
     return false;
@@ -211,7 +186,7 @@ export async function reviewAutoSetup(
     );
     return false;
   }
-  ctx.ui.notify(report(draft), "info");
+  ctx.ui.notify(autoSetupReport(draft), "info");
   const action = await ctx.ui.select("Auto Setup proposal", [
     "Discuss/refine",
     "Confirm settings",

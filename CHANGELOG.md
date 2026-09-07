@@ -13,6 +13,9 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ### Auto Setup
 
+- Give research and refinement an allowlisted, bounded snapshot of existing roles/settings and exact candidate capabilities; refinement no longer relies on conversation history for supported efforts or unused models. Disclose the added configuration context and reject over-limit prompts before dispatch.
+- Apply prompt/context-engineering guidance to task-fit comparisons, whole-task routing boundaries, existing-role overlap checks, provisional effort selection, default/selector trade-offs, and targeted public-model research. Request reviewable synthetic match/near-miss examples without claiming measured accuracy; keep the proposal/YAML schemas and top-level settings unchanged.
+- Show effort rationales, evidence-model references, trade-offs, default recommendations, upstream mappings and benchmark conditions in review. Final confirmation now displays exact merged before/after role values rather than change labels alone.
 - Add an optional primary-TUI Auto Setup flow: select up to eight cached available models, ask the current Pi model to research them with its configured tools when available, then review/discuss/cancel a bounded proposal before any role save.
 - Share the bounded model picker with role editing. Auto Setup retains up to eight checked candidates across searches/pages, with Space or Tab to toggle.
 - Show mixed per-model evidence states, agent-reported citations and caveats, exact-model identity limits, offline/no-evidence outcomes, and reasoned role/effort recommendations. Research and refinement now use a shared role-design rubric, positive/negative few-shot descriptions, and pairwise overlap checks to favor a small set of task-observable routing criteria. Auto Setup does not bundle a search provider, credentials, a benchmark database, or a tool sandbox.

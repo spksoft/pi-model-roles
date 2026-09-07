@@ -22,7 +22,9 @@ Restart Pi or run `/reload`.
 
 2. Choose **Auto Setup**, the first Settings item. Select one to eight available models to consider, then confirm the research disclosure.
 
-3. After research settles, Auto Setup opens the review automatically. Review the proposed evidence and role changes, ask **Discuss/refine** if needed, then confirm the exact configuration diff to save it.
+3. After research settles, Auto Setup opens the review automatically. Review evidence, model/effort trade-offs, and before/after role settings. Use **Discuss/refine** to state your workload and priorities—for example, “Favor reliability for cross-file debugging; keep routine edits inexpensive.” Confirm the exact configuration diff to save it.
+
+Auto Setup compares candidates with your existing roles and settings. It aims for a small, distinct role set and justified reasoning effort, not one role per model or maximum effort everywhere. Without stated priorities, its guidance favors a conservative balance of reliability, latency, and cost; recommendations are not measured guarantees. See [how recommendations are designed](docs/configuration.md#how-auto-setup-designs-recommendations).
 
 Auto Setup uses the current Pi agent and any tools you already enabled; it does not switch your active model or apply changes without confirmation. With only the inherited `default` role, Pi makes no extra selection request. When custom roles exist, the default model classifies eligible new prompts: one clear match uses that role; no match or overlapping matches use `default`.
 

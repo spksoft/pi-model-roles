@@ -179,16 +179,18 @@ export class AutoSetupController {
             generation: runtime.generation,
             draft: previousDraft,
             question: question ?? "",
+            currentConfig: this.store.snapshot.config,
           })
         : buildResearchPrompt({
             requestId: runtime.requestId,
             generation: runtime.generation,
             candidates,
+            currentConfig: this.store.snapshot.config,
           });
     } catch (error) {
       ctx.ui.notify(
         error instanceof Error && error.message === "too_large"
-          ? "Auto Setup discussion is too large to send safely. Start a new pass or shorten the question."
+          ? "Auto Setup context exceeds the 32 KiB prompt limit. Shorten the discussion or role descriptions, start a smaller pass, or use manual role editing. Nothing was sent."
           : "Auto Setup could not prepare the research request.",
         "warning",
       );

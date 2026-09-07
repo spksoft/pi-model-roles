@@ -15,6 +15,7 @@ export function fakeUI() {
   const customAnswers: unknown[] = [];
   const customRenders: string[][] = [];
   const selections: Array<{ title: string; options: string[] }> = [];
+  const confirmations: Array<{ title: string; message: string }> = [];
   let editor = "";
   let cancelLoader = false;
   const theme = {
@@ -42,7 +43,10 @@ export function fakeUI() {
     },
     input: async () => answers.shift(),
     editor: async () => answers.shift(),
-    confirm: async () => answers.shift() ?? false,
+    confirm: async (title: string, message: string) => {
+      confirmations.push({ title, message });
+      return answers.shift() ?? false;
+    },
     custom: (factory: Parameters<ExtensionUIContext["custom"]>[0]) =>
       new Promise<unknown>((resolve, reject) => {
         let finished = false;
@@ -90,6 +94,7 @@ export function fakeUI() {
     customAnswers,
     customRenders,
     selections,
+    confirmations,
     get editor() {
       return editor;
     },

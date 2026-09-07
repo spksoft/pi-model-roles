@@ -96,6 +96,24 @@ test("confirmed Auto Setup save preserves the active model and writes only the r
     assert.ok(quick && quick.model !== "inherit");
     assert.equal(quick.model.id, "owner/fast");
     assert.equal(quick.effort, "low");
+    const confirmation = h.ui.confirmations.find(
+      (item) => item.title === "Save Auto Setup role changes?",
+    );
+    assert.ok(confirmation);
+    assert.match(confirmation.message, /Before: \(absent\)/);
+    assert.match(confirmation.message, /"effort":"low"/);
+    assert.ok(
+      confirmation.message.includes(JSON.stringify(offlineProposal().roles[0]!.description)),
+    );
+    const disclosure = h.ui.confirmations.find(
+      (item) => item.title === "Start Auto Setup research?",
+    );
+    assert.match(
+      disclosure?.message ?? "",
+      /current role descriptions, assignments, enabled state, and selector timeout/,
+    );
+    const report = h.ui.notifications.find((message) => message.startsWith("Auto Setup report"));
+    assert.ok(report?.includes(offlineProposal().roles[0]!.effortRationale));
     assert.equal(h.session.model?.id, "default");
     assert.equal(h.session.thinkingLevel, "high");
     assert.equal(h.errors.length, 0);
@@ -122,6 +140,9 @@ for (const routing of ["inherited", "custom", "default-override"] as const)
         await store.save(settings, snapshot.revision);
         await h.session.reload();
       }
+      const before = await new ConfigStore(h.dir).load(false);
+      assert.ok(before);
+      const prompts: string[] = [];
       const calls: Array<{ model: string; effort: string | undefined }> = [];
       h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel]);
       h.ui.answers.push(
@@ -138,6 +159,7 @@ for (const routing of ["inherited", "custom", "default-override"] as const)
             ? message.content[0]
             : undefined;
         const text = content?.type === "text" ? content.text : "";
+        prompts.push(text);
         const requestId = JSON.parse(text.match(/requestId\s+("[^"]+")/)?.[1] ?? '""');
         const generation = Number(text.match(/generation\s+(\d+)/)?.[1]);
         assert.ok(requestId && generation);
@@ -180,11 +202,66 @@ for (const routing of ["inherited", "custom", "default-override"] as const)
       );
       assert.equal(h.session.model?.id, "default");
       assert.equal(h.session.thinkingLevel, "high");
+      assert.equal(prompts.length, 2);
+      for (const prompt of prompts) {
+        const current = JSON.parse(prompt.split("## Current configuration")[1]!.split("\n")[1]!);
+        assert.equal(current.enabled, before.config.enabled);
+        assert.equal(current.selectorTimeoutMs, before.config.selectorTimeoutMs);
+        assert.deepEqual(
+          current.roles,
+          Object.entries(before.config.roles)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([id, role]) => ({ id, ...role })),
+        );
+        const selected = JSON.parse(prompt.split("## Selected candidates")[1]!.split("\n")[1]!);
+        assert.deepEqual(
+          selected.map((candidate: { model: unknown }) => candidate.model),
+          [defaultModel, fastModel],
+        );
+        assert.ok(
+          selected.every(
+            (candidate: { supportedEfforts: string[]; contextWindow: number }) =>
+              candidate.supportedEfforts.length > 0 && candidate.contextWindow > 0,
+          ),
+        );
+      }
+      assert.deepEqual(await new ConfigStore(h.dir).load(false), before);
       assert.deepEqual(h.errors, []);
     } finally {
       await h.close();
     }
   });
+
+test("oversized existing role context fails before dispatch and leaves configuration intact", async () => {
+  const h = await sdkHarness();
+  try {
+    const store = new ConfigStore(h.dir);
+    const before = await store.load(false);
+    assert.ok(before);
+    const settings = structuredClone(before.config);
+    for (let index = 0; index < 8; index++)
+      settings.roles[`large${index}`] = {
+        model: fastModel,
+        effort: "low",
+        description: "界".repeat(2000),
+      };
+    const saved = await store.save(settings, before.revision);
+    await h.session.reload();
+    h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel], { type: "close" });
+    h.ui.answers.push(true);
+    await h.session.prompt("/model-roles settings");
+    await h.session.waitForIdle();
+    assert.equal(h.faux.state.callCount, 0);
+    assert.ok(h.ui.notifications.some((message) => message.includes("32 KiB prompt limit")));
+    assert.equal(h.session.extensionRunner.getActiveTools?.().includes(AUTO_SETUP_TOOL), false);
+    assert.deepEqual(await store.load(false), saved);
+    assert.equal(h.session.model?.id, "default");
+    assert.equal(h.session.thinkingLevel, "high");
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.close();
+  }
+});
 
 test("automatic Auto Setup review can cancel without a separate review command or configuration write", async () => {
   const h = await sdkHarness();
