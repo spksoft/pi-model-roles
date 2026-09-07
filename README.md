@@ -38,10 +38,21 @@ Run these inside Pi:
 | `/model-roles use <role>` | Choose a role for the current session without classification. |
 | `/model-roles disable` | Pin the current model and effort by pausing automatic selection. |
 | `/model-roles enable` | Allow the next eligible prompt to be selected automatically. |
+| `/model-roles run /command [arguments]` | Select a model, then invoke a registered command while idle; respects manual/disabled routing. |
 
 Manual model or reasoning-effort changes also pause automatic selection. Your Pi defaults are never rewritten.
 
-**Routing scope:** selection runs before a new idle TUI submission, not on each tool-loop turn or in headless/child sessions. Per-turn switching and the automatic pi-subagents background bridge are unsupported on the tested versions. See [why and the supported alternatives](docs/compatibility.md#per-turn-routing-is-not-supported).
+**Routing scope:** selection runs before a new idle TUI submission, including registered prompt templates such as `/plan <description>` and `/skill:name <task>`. It classifies the command and arguments as submitted, before expansion—not the template/skill body. Extension-owned commands (as opposed to prompt templates), tool-loop turns, and headless/child sessions are not automatically routed. See [supported contexts and limitations](docs/compatibility.md#where-automatic-routing-applies).
+
+### Commands that launch tasks
+
+For extension-owned commands that skip automatic routing, use the explicit wrapper:
+
+```text
+/model-roles run /execute-plan docs/plan/feature.html
+```
+
+The target command must already be installed. The wrapper routes from its name and arguments, then invokes the original command unchanged—no changes to Pi or the command's package are needed. It selects the **parent session model**, not any subagent models. Run `/model-roles enable` first if selection is paused. See [command routing, privacy, and recovery](docs/compatibility.md#run-an-extension-owned-command).
 
 ## Manual role setup
 
@@ -71,7 +82,7 @@ Use Settings instead of editing YAML unless you need the detailed options in the
 
 ## Cost and privacy
 
-Custom roles can add one selector request before an eligible idle TUI submission. The selector receives submitted task text and role descriptions—not automatically collected history, tool results, image bytes, or loaded system/skill/context files. Text you paste into the task is still included; this is not a secret detector. The selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See [cost and privacy safeguards](docs/configuration.md#advanced-limits-and-safeguards).
+Custom roles can add one selector request before an eligible idle TUI submission, including `/model-roles run`. The selector receives submitted task text and role descriptions—not automatically collected history, tool results, image bytes, or loaded system/skill/context files. Text you paste into the task is still included; this is not a secret detector. The selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See [cost and privacy safeguards](docs/configuration.md#advanced-limits-and-safeguards).
 
 ## Detailed guides
 

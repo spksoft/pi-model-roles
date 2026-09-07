@@ -209,6 +209,11 @@ export async function handleCommand(
       );
     return;
   }
+  const run = /^run(?:\s+([\s\S]*))?$/.exec(args.trimStart());
+  if (run) {
+    await controller.runCommand(ctx, run[1] ?? "");
+    return;
+  }
   await ctx.waitForIdle();
   const parts = args.trim().split(/\s+/);
   const action = parts[0];
@@ -218,7 +223,7 @@ export async function handleCommand(
   else if (action === "use" && parts[1] && !parts[2]) await controller.use(ctx, parts[1]);
   else
     ctx.ui.notify(
-      "Use /model-roles settings, /model-roles enable, /model-roles disable, or /model-roles use <role>.",
+      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, or /model-roles run /command [arguments].",
       "info",
     );
 }

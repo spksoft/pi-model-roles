@@ -8,6 +8,8 @@ The API answers one question: **which model and thinking effort should handle th
 
 Auto Setup is intentionally **not** a public research/search API. It is a primary-TUI workflow inside this package that uses the current normal Pi agent and the user's configured tools, stores a review draft, and requires an explicit YAML confirmation. It does not expose cross-extension web-tool execution, provider credentials, benchmark data, or a new selection API contract.
 
+For an existing extension-owned slash command, primary-TUI users can instead invoke [`/model-roles run /command [arguments]`](compatibility.md#run-an-extension-owned-command). This repo-local wrapper applies parent-session selection and delegates through Pi's public command dispatch, without requiring the target extension to import this package or emit selection events. It preserves manual/disabled routing; it is not a child-launcher integration, a completion API, or automatic interception of bare commands. The non-mutating library/event contracts below are unchanged.
+
 ## Choose an integration
 
 | Your host | Use | Who supplies configuration? |

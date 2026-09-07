@@ -31,6 +31,8 @@ export async function sdkHarness(
     tools?: string[];
     /** Load only synthetic skills provisioned under the isolated fixture directory. */
     skills?: boolean;
+    /** Load only synthetic prompt templates provisioned under the isolated fixture directory. */
+    prompts?: boolean;
     prepare?: (dir: string, faux: FauxProviderHandle) => Promise<void>;
   } = {},
 ) {
@@ -81,7 +83,7 @@ export async function sdkHarness(
     noExtensions: true,
     noSkills: !options.skills,
     noThemes: true,
-    noPromptTemplates: true,
+    noPromptTemplates: !options.prompts,
     noContextFiles: true,
     extensionFactories: [
       ...(options.roleExtension === false ? [] : [options.roleExtension ?? modelRoles]),

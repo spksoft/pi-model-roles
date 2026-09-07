@@ -25,18 +25,39 @@ GitHub install/update/remove syntax follows [Pi's package documentation](https:/
 | --- | --- |
 | Primary interactive terminal session, new prompt while idle | Automatic selection when the footer shows `auto-selector=enabled`. |
 | Tools, retries, steering, or already-queued follow-ups | Keep the active model; no independent selection. |
-| Slash-command expansions or extension-generated messages | No independent automatic routing. |
+| Registered prompt templates (for example `/plan <description>`) and `/skill:name <task>`, submitted interactively while idle | Select once from the raw command and arguments before Pi expands them. No template/skill body is sent to the selector. |
+| Extension-owned commands, unknown slash commands, or extension-generated messages | No independent automatic routing. Pi dispatches registered extension commands before the input hook. Use the explicit `run` wrapper for registered commands. |
+| `/model-roles run /command [arguments]`, primary TUI while idle | Explicit pre-command selection using the same roles and manual/disabled state, followed by normal command dispatch. |
 | Print, JSON, RPC, or headless/SDK hosts | No automatic routing or configuration creation. Integrate through the API explicitly. |
 | Known pi-subagents children | Ambient copies of this extension stay inactive; the launcher selects before launch. |
 | Other subagent tools or external CLI runners | No universal interception or automatic model translation. Require an explicit integration. |
 
 The package uses Pi's cached model availability and capabilities. It does not probe providers on each task, change authentication, or bypass model scope and launcher permissions. Structurally valid roles can remain saved even when their models are temporarily unavailable.
 
+## Run an extension-owned command
+
+Use the wrapper when a command launches work through extension-generated messages, as `/execute-plan` does:
+
+```text
+/model-roles run /execute-plan docs/plan/feature.html
+```
+
+The command must already be installed and invokable in this session. pi-model-roles does not provide `/execute-plan`, modify its package, or replace its handler. Running `/execute-plan` directly still skips model selection. This wrapper uses only Pi 0.85.1's public command discovery, model selection, and message-dispatch APIs.
+
+- **Eligible targets:** registered extension commands, prompt templates, and skills. Use the exact invokable name, including a numeric suffix such as `/review:2` if Pi assigned one. Separate the name and arguments with a space; arguments, quoting, and subsequent newlines are forwarded unchanged. Built-in commands, unknown names, and `/model-roles` itself (including numeric aliases) are rejected before selection. It is a command wrapper, not a shell runner.
+- **When it runs:** primary TUI only, while idle with no queued messages or pending selection. Busy submissions are refused immediately, not queued or delayed. Manual/disabled routing preserves the current pair and gives a notice; enable Auto Selector separately if classification is wanted. Default-only configuration still makes no classifier request.
+- **Data and cost:** at most one selector request from the raw target command and arguments, subject to the normal limits and fallback rules. The wrapper does not read referenced files, command descriptions, generated kickoff prompts, or plan contents for classification. A filename may be insufficient to distinguish task roles; use `/model-roles use <role>` for an exact choice. Arguments are not secret-filtered. The wrapper is text-only and does not forward new image attachments; existing conversation image-capability checks still apply.
+- **Cancellation and changes:** Escape during selection restores `/model-roles run ...` without invoking the target. Manual changes, reload/navigation, shutdown, or an intervening agent start invalidate pending selection. Before dispatch the wrapper checks session/idle state and public command ownership metadata again. If ownership changed, no target is dispatched, but a model may already have been selected; check the footer before retrying. An already-started Pi model switch retains the [usual limitation](#model-switch-limitation).
+- **After dispatch:** the selected pair remains active; it is not a temporary override. Pi's public `sendUserMessage` API is fire-and-forget. Target preparation, permissions, validation, explicit model overrides, completion, and failures remain the original command's responsibility. The wrapper does not report command success, automatically retry, revert the model, or undo target effects. Wait for the target's own preparation/work to finish before starting another command or changing model/session. Check Pi's diagnostics and any effects before retrying an error.
+- **Parent only:** a command can explicitly change the parent model afterward or launch children with their own model settings. The wrapper does not translate or override subagent/runner model choices. Auto Setup and other generated messages remain excluded from independent routing.
+
+These semantics are tested with synthetic command owners through the real Pi SDK, including generated kickoff messages and actual dispatch model/effort. They do not establish full end-to-end acceptance of a separately installed planning package or live providers.
+
 ## Per-turn routing is not supported
 
 On tested **Pi 0.85.1**, the `context` event runs after the agent loop captures the request's model and thinking effort, and before Pi converts its internal messages to provider messages. Calling `pi.setModel()` there changes session state but not that request's captured pair. A selector can appear to work in the footer while execution uses the previous pair.
 
-The experimental context hook and full-history projector have therefore been withdrawn. Routing stays at the supported idle primary-TUI `input` boundary, before model/authentication checks and pre-prompt compaction. Tool loops, queued work, slash/skill expansion, Auto Setup, non-TUI modes, and children are not independently rerouted. No lossy substitute for full-context routing is used and no dependency is patched.
+The experimental context hook and full-history projector have therefore been withdrawn. Routing stays at the supported idle primary-TUI `input` boundary, before model/authentication checks and pre-prompt compaction. Registered prompt-template and skill submissions route once at that boundary from their raw command text; expansion itself does not trigger another selection. Tool loops, queued work, extension-owned commands, Auto Setup, non-TUI modes, and children are not independently rerouted. No lossy substitute for full-context routing is used and no dependency is patched.
 
 Automatic child routing also lacks a public way to carry pi-subagents' resolved model-scope authority into this extension. `createPiSubagentsBackgroundBridge(pi)` always returns `unsupported/automatic_child_routing_unsupported`; it does not register an agent, subscribe, start a timer, or emit RPC/spawn requests—even with a compatible owner. The withdrawn child entry stays inert regardless of environment bindings. This avoids changing extension-loading policy, escaping model restrictions, or abandoning a late-accepted launch. Use [explicit selection before an existing launcher](api.md#optional-pi-subagents-example), providing resolved pins and permitted models before selection; the launcher retains final authority.
 
@@ -60,6 +81,9 @@ Start with the footer's `auto-selector=enabled|disabled` indicator, then open `/
 | Extension fails to load after an update | Restart Pi or run `/reload`. If it remains unavailable, run `pi update git:github.com/spksoft/pi-model-roles`, then check `pi list` and `pi config`. |
 | Role model picker still shows the whole catalog after updating | Run `pi update git:github.com/spksoft/pi-model-roles` in your shell, then restart Pi or run `/reload` and reopen `/model-roles settings`. All model pickers show at most eight rows with type-to-search. Check `pi list`/`pi config` for a duplicate older copy if it persists. |
 | No extra request runs | This is normal with only `default`, no eligible custom roles, bypassed input, or `auto-selector=disabled`. |
+| `/plan <description>` or `/skill:name <task>` does not select | Update this package and reload Pi; older versions skipped every slash-prefixed input. Check `auto-selector=enabled` and that eligible custom roles exist. Registered templates and skills now route before expansion; an extension that owns the same command name bypasses Pi's input hook. Use `/model-roles run /command [arguments]` for those commands, or choose `/model-roles use <role>` first (then disable Auto Selector if the pair must stay pinned). |
+| `/execute-plan` starts without selecting | Invoke `/model-roles run /execute-plan ...` while idle with Auto Selector enabled. The bare command still follows its original, unrouted path. The target must be installed separately. |
+| `run` says the target or session changed | The target was not dispatched. Let any model switch/work finish, check the active pair and exact command name, then resubmit. After any dispatch error, inspect Pi's diagnostics and target effects first; the wrapper never retries automatically. |
 | Routing stopped after you changed models | Manual model/thinking changes disable automation for the session. Run `/model-roles enable` to resume on the next eligible prompt. |
 | A manually used role changed on the next prompt | `/model-roles use <role>` preserves Auto Selector state. Run `/model-roles disable` after choosing the role when it must stay pinned. |
 | A task used default instead of a custom role | Look for `no_match`, `ambiguous`, unavailable-role warnings, or a selector failure. Make descriptions more specific and avoid overlap. Default fallback is intentional. |
@@ -147,6 +171,8 @@ Coverage includes:
 - Model/effort precedence, exact IDs, allowlists, image capabilities, strict classifier output, fallback, timeout, cancellation, and privacy sentinels.
 - Default inheritance and trust-aware reads without rewriting Pi settings.
 - Real Pi SDK lifecycle ordering, manual choices, reload/navigation, delayed model application, queued follow-ups, and headless/child bypass.
+- Registered prompt-template/skill routing before expansion, raw multiline/quoted arguments, actual dispatch model/effort, selector privacy, cancellation, fallback, removed templates, and extension-command ownership. Synthetic templates reproduce the `/plan` entry path; this is not an end-to-end test of a separate planning package.
+- Explicit route-and-run delegation through Pi's public command dispatch, argument preservation, single-selection generated kickoff, manual/disabled behavior, busy/unknown/recursive rejection, ownership changes, selection/model-application cancellation, and no automatic dispatch retries.
 - Smaller-context model selection before Pi compaction using a fake transport; this does not establish live-provider compaction behavior.
 - Native dialog draft cancellation, role management, explicit role use, resume, reset, and session-targeted event isolation/disposal.
 - Real component keyboard input through SDK role creation/edit/default flows with a large three-provider fake catalog; shared picker pagination, fuzzy queries, exact refs, inherited default, multi-selection persistence, terminal-size render bounds, and focus forwarding.

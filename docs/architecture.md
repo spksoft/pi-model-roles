@@ -41,7 +41,7 @@ Settings and Auto Setup
 
 ## Routing a new task
 
-Automatic routing applies only to a new interactive prompt submitted while a primary TUI session is idle. It does not independently reroute tools, retries, steering, queued follow-ups, slash-command expansions, headless sessions, or known subagent children.
+Automatic routing applies only to a new interactive prompt submitted while a primary TUI session is idle. This includes registered prompt templates such as `/plan <description>` and `/skill:name <task>`. It does not independently reroute tools, retries, steering, queued follow-ups, extension-generated messages, headless sessions, or known subagent children.
 
 This is an explicit host boundary: Pi 0.85.1 snapshots model/effort before its `context` hook. The package does not switch models there or project full conversation history for classification. It selects from submitted task text at `input`, before the supported pre-prompt preparation/dispatch boundary. See [per-turn compatibility](compatibility.md#per-turn-routing-is-not-supported).
 
@@ -60,9 +60,26 @@ New eligible prompt
   -> Let Pi prepare and execute the task normally
 ```
 
-The selector sees only the submitted task text and the eligible custom-role IDs and descriptions. It receives neither image bytes nor automatically loaded conversation history, repository files, execution tools, or raw provider credentials. The selector must return strict JSON naming clear matches. Its output never becomes execution instructions.
+Slash-prefixed submissions are checked against Pi's current public `getCommands()` metadata. Only prompt-template and skill sources are eligible; extension-owned and unknown commands are not. Pi dispatches registered extension commands before `input`, so a command that shadows a template remains outside automatic routing. Existing command registrations and handlers are never replaced or re-registered. Metadata is read locally on each eligible slash submission, so resource reloads do not leave a stale allowlist.
+
+The selector sees only the submitted task text (including the raw command name and arguments) and the eligible custom-role IDs and descriptions. Command descriptions, source paths, and expanded template/skill bodies are not added. Pi expands the unchanged submission after routing; cancellation restores the original command, not its expansion. The selector receives neither image bytes nor automatically loaded conversation history, repository files, execution tools, or raw provider credentials. The selector must return strict JSON naming clear matches. Its output never becomes execution instructions.
 
 The selected model and effort remain active for the task's tools, retries, and queued follow-ups. The next eligible idle prompt starts again from the resolved default, not the previous task's execution model.
+
+## Explicit command routing
+
+`/model-roles run /command [arguments]` is a separate, opt-in entry point for extension-owned commands. `src/pi/command-target.ts` validates an exact invokable name against public `getCommands()` metadata; built-ins, unknown names, and recursive model-roles calls are rejected. The controller shares its bounded selection/application flow with ordinary input rather than pretending generated messages are interactive input.
+
+```text
+Explicit run while idle
+  -> Resolve registered target and snapshot public ownership metadata
+  -> Select/apply from the raw target command and arguments (or preserve manual/disabled state)
+  -> Recheck session generation, idle/queue state, and target ownership
+  -> pi.sendUserMessage(target, { expandPromptTemplates: true })
+  -> Original handler or normal template/skill expansion
+```
+
+No target file or generated prompt is read for selection. Target-generated messages retain `source=extension`, so they do not trigger a second selector. An intervening agent start invalidates pending selection, as do manual changes, reload/navigation, and shutdown. Cancellation restores the wrapper text without dispatch. Once handed off, the original command owns execution, model overrides, permissions, and any child launches. Public dispatch is fire-and-forget; the wrapper neither reports target completion nor retries or rolls back target effects. See [command boundaries](compatibility.md#run-an-extension-owned-command).
 
 ## Precedence and fallback
 

@@ -12,6 +12,7 @@ import type {
 } from "../core/types.js";
 import { withSelectionLoader } from "../ui/selection-loader.js";
 import { currentState, piDependencies, readDefaults } from "./adapters.js";
+import { commandTarget, sameCommandTarget } from "./command-target.js";
 import {
   DECISION_ENTRY,
   STATE_ENTRY,
@@ -29,6 +30,7 @@ export class RolesController {
   private generation = 0;
   private sessionId?: string;
   private pending?: AbortController;
+  private commandPending = false;
   private expected?: { model: ModelRef; effort?: Effort; phase: "model" | "effort" };
   private pinned?: ModelState;
   constructor(
@@ -59,6 +61,10 @@ export class RolesController {
   invalidate(): void {
     this.generation++;
     this.pending?.abort();
+  }
+  agentStarted(): void {
+    // Another extension can start work while an idle selector is awaiting a provider.
+    if (this.pending) this.invalidate();
   }
   shutdown(ctx: ExtensionContext): void {
     this.active = false;
@@ -290,6 +296,18 @@ export class RolesController {
     }
     return unavailable("stale", true);
   }
+  private isPromptInput(text: string): boolean {
+    if (!text.trimStart().startsWith("/")) return true;
+    const name = /^\/(\S+)/.exec(text)?.[1];
+    if (!name) return false;
+    // Pi lists extension commands first. Never treat a command owner as a template,
+    // or send descriptions, expanded bodies, or source paths to the selector.
+    const command = this.pi.getCommands().find((item) => item.name === name);
+    return (
+      command?.source === "prompt" ||
+      (command?.source === "skill" && (text === `/${name}` || text.startsWith(`/${name} `)))
+    );
+  }
   async input(
     event: InputEvent,
     ctx: ExtensionContext,
@@ -299,10 +317,25 @@ export class RolesController {
       ctx.mode !== "tui" ||
       event.source !== "interactive" ||
       event.streamingBehavior ||
-      !ctx.isIdle() ||
-      event.text.trimStart().startsWith("/")
+      !ctx.isIdle()
     )
       return { action: "continue" };
+    try {
+      if (!this.isPromptInput(event.text)) return { action: "continue" };
+    } catch {
+      ctx.ui.notify(
+        "Model roles: command discovery failed; keeping Pi's current model.",
+        "warning",
+      );
+      return { action: "continue" };
+    }
+    return this.routeSubmission(event, ctx);
+  }
+  private async routeSubmission(
+    event: Pick<InputEvent, "text" | "images">,
+    ctx: ExtensionContext,
+    restoreText = event.text,
+  ): Promise<{ action: "continue" | "handled" }> {
     if (this.mode === "manual" || !this.store.snapshot?.config.enabled)
       return { action: "continue" };
     if (this.pending) {
@@ -322,7 +355,7 @@ export class RolesController {
       const work = () => this.select(ctx, request);
       const manyRoles = Object.keys(this.store.snapshot.config.roles).length > 1;
       let decision = manyRoles ? await withSelectionLoader(ctx, controller, work) : await work();
-      if (token !== this.generation || controller.signal.aborted)
+      if (token !== this.generation || controller.signal.aborted || !ctx.isIdle())
         decision = unavailable("cancelled", true);
       if (decision.status !== "cancelled")
         decision = await this.apply(ctx, decision, request, token);
@@ -332,7 +365,7 @@ export class RolesController {
           this.sessionId === session &&
           session === ctx.sessionManager.getSessionId()
         ) {
-          ctx.ui.setEditorText(event.text);
+          ctx.ui.setEditorText(restoreText);
           if (event.images?.length)
             ctx.ui.notify(
               "Submission cancelled. Reattach images before resubmitting if needed.",
@@ -348,6 +381,70 @@ export class RolesController {
       return { action: "continue" };
     } finally {
       if (this.pending === controller) this.pending = undefined;
+    }
+  }
+  async runCommand(ctx: ExtensionContext, text: string): Promise<void> {
+    if (!this.active || ctx.mode !== "tui") return;
+    if (!ctx.isIdle() || ctx.hasPendingMessages() || this.pending || this.commandPending) {
+      ctx.ui.notify(
+        "Model roles: wait for current work or selection to finish, then run again.",
+        "warning",
+      );
+      return;
+    }
+    this.commandPending = true;
+    const token = this.generation;
+    const session = this.sessionId;
+    const restoreText = `/model-roles run ${text}`;
+    try {
+      const discovered = commandTarget(text, this.pi.getCommands());
+      if (!discovered) {
+        ctx.ui.notify(
+          "Use /model-roles run /command [arguments] with a registered extension command, prompt template, or skill. Built-ins, unknown commands, and model-roles itself are not supported. Separate arguments with a space.",
+          "warning",
+        );
+        return;
+      }
+      const target = structuredClone(discovered);
+      const result = await this.routeSubmission({ text }, ctx, restoreText);
+      if (result.action === "handled") return;
+      if (
+        !this.active ||
+        this.sessionId !== session ||
+        session !== ctx.sessionManager.getSessionId()
+      )
+        return;
+      if (
+        token !== this.generation ||
+        !ctx.isIdle() ||
+        ctx.hasPendingMessages() ||
+        !sameCommandTarget(target, commandTarget(text, this.pi.getCommands()))
+      ) {
+        ctx.ui.setEditorText(restoreText);
+        ctx.ui.notify(
+          "Model roles: state or command ownership changed; command was not dispatched. Submit again when idle.",
+          "warning",
+        );
+        return;
+      }
+      if (!this.autoSelectorEnabled)
+        ctx.ui.notify(
+          "Auto Selector is disabled or unavailable; running the command with the current model and effort.",
+          "info",
+        );
+      // Public dispatch preserves the target's handler, permissions, and argument parsing.
+      // Generated messages keep source=extension, so they cannot cause a second selection.
+      this.pi.sendUserMessage(text, { expandPromptTemplates: true });
+    } catch {
+      if (this.active && this.sessionId === session) {
+        ctx.ui.setEditorText(restoreText);
+        ctx.ui.notify(
+          "Model roles: could not dispatch the command. Check Pi's diagnostics before retrying; commands are never retried automatically.",
+          "warning",
+        );
+      }
+    } finally {
+      this.commandPending = false;
     }
   }
   async use(ctx: ExtensionContext, role: string): Promise<void> {

@@ -44,6 +44,10 @@ test("automatic selection never adds tool history or expanded skill files to tas
         return fauxAssistantMessage("SYNTHETIC_ASSISTANT_HISTORY");
       },
       (context) => {
+        selectors.push(JSON.stringify(context));
+        return fauxAssistantMessage('{"matches":["fast"]}');
+      },
+      (context) => {
         skillContext = JSON.stringify(context.messages);
         return fauxAssistantMessage("Skill completed.");
       },
@@ -58,8 +62,8 @@ test("automatic selection never adds tool history or expanded skill files to tas
     await h.session.prompt("Continue the synthetic task");
     assert.match(toolContext, /SYNTHETIC_CONTEXT_FILE_BODY/);
     assert.match(skillContext, /SYNTHETIC_SKILL_BODY/);
-    assert.equal(selectors.length, 2);
-    assert.equal(h.faux.state.callCount, 6);
+    assert.equal(selectors.length, 3);
+    assert.equal(h.faux.state.callCount, 7);
     for (const data of selectors) {
       assert.doesNotMatch(
         data,
@@ -67,7 +71,8 @@ test("automatic selection never adds tool history or expanded skill files to tas
       );
       assert.doesNotMatch(data, /Synthetic fixture\. No tools\./);
     }
-    assert.match(selectors[1] ?? "", /Continue the synthetic task/);
+    assert.match(selectors[1] ?? "", /\/skill:synthetic/);
+    assert.match(selectors[2] ?? "", /Continue the synthetic task/);
     const metadata = JSON.stringify(
       h.session.sessionManager.getBranch().filter((entry) => entry.type === "custom"),
     );

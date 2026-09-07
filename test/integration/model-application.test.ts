@@ -127,7 +127,7 @@ test("manual changes during fallback authentication cancel the task and restore 
   }
 });
 
-test("controller ignores raw slash commands, queued work, extension input, and non-idle work", async () => {
+test("controller ignores unknown slash commands, queued work, extension input, and non-idle work", async () => {
   const { h, c } = await harness();
   try {
     for (const event of [

@@ -29,6 +29,7 @@ test("published configuration examples parse and API documents every reason", as
     "/model-roles enable",
     "/model-roles disable",
     "/model-roles use <role>",
+    "/model-roles run /command [arguments]",
   ]) {
     assert.ok(readme.includes(command), `README missing ${command}`);
     assert.ok(configuration.includes(command), `configuration missing ${command}`);
@@ -66,6 +67,7 @@ test("first-role consent describes the supported task-only routing and preserves
   assert.equal(await confirmFirstCustomRoleRouting(ctx, defaultConfig(), config()), false);
   assert.match(disclosure, /idle TUI submission/);
   assert.match(disclosure, /submitted task text and role descriptions/);
+  assert.match(disclosure, /explicit \/model-roles run command/);
   assert.match(disclosure, /not automatically collected/);
   assert.match(disclosure, /not secret-filtered/);
   assert.match(disclosure, /Auto Setup are not independently rerouted/);

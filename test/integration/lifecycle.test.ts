@@ -56,7 +56,7 @@ test("real SDK: default-only startup, routing before execution, manual pause, re
     await h.close();
   }
 });
-test("real SDK: raw expansion commands, extension inputs and headless/child sessions bypass routing", async () => {
+test("real SDK: headless/child sessions bypass routing", async () => {
   for (const mode of ["json", "rpc", "print"] as const) {
     const h = await sdkHarness({ mode });
     try {

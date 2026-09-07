@@ -19,6 +19,7 @@ export function modelRoleCommandCompletions(
       ? { value: "disable", label: "Disable Auto Selector" }
       : { value: "enable", label: "Enable Auto Selector" },
     ...roleIds.map((id) => ({ value: `use ${id}`, label: `Use ${id}` })),
+    { value: "run", label: "Run command with model routing" },
   ].filter((item) => item.value.startsWith(prefix));
 }
 
@@ -76,7 +77,10 @@ export default function modelRoles(pi: ExtensionAPI): void {
     autoSetup.modelChanged(ctx);
     controller.externalChange(ctx, "effort");
   });
-  pi.on("agent_start", (_event, ctx) => autoSetup.agentStarted(ctx));
+  pi.on("agent_start", (_event, ctx) => {
+    controller.agentStarted();
+    autoSetup.agentStarted(ctx);
+  });
   pi.on("agent_settled", (_event, ctx) => {
     const requestId = autoSetup.agentSettled(ctx);
     if (!requestId) return;

@@ -4,6 +4,19 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ## 0.1.0 — Unreleased
 
+### Explicit command routing
+
+- Add `/model-roles run /command [arguments]` to select/apply a parent model before invoking an existing extension-owned command such as `/execute-plan` through Pi's public API. No edits to Pi, planning packages, providers, or runners are required; original command names/handlers stay unchanged.
+- Reuse normal role policy, manual/disabled state, default-only zero-request behavior, limits, cancellation and fallbacks. Select only from raw target text; preserve exact arguments without reading plan files or classifying generated kickoff prompts. Generated inputs and child models are not independently rerouted.
+- Refuse busy/queued work, unknown/built-in targets and recursive model-roles calls. Recheck session and public command ownership before dispatch, invalidate pending selection on intervening agent starts, and restore the full wrapper on cancellation. Never retry target commands or claim completion from fire-and-forget dispatch.
+- Cover real-SDK command delegation, parent overrides, target errors, privacy, manual pins, model-application races, session invalidation and stale ownership. Document text-only input, selector costs, target authority and recovery; expand command completion and first-role consent.
+
+### Slash-prompt routing
+
+- Fix the blanket slash-input bypass: registered prompt templates such as `/plan <description>` and `/skill:name <task>` now select once before expansion in idle primary-TUI sessions. Only the raw command and arguments reach the selector, not resource bodies or command metadata.
+- Preserve manual/disabled routing, default-only zero-request behavior, cancellation, fallback, queue and Auto Setup safeguards. Extension-owned commands still bypass Pi's input hook; unknown slash commands remain excluded. No upstream package or private host API changes are required.
+- Add real-SDK synthetic command regressions that verify actual dispatch pairs, privacy and unchanged expansion rather than just footer state; clarify supported command types and recovery in user guidance.
+
 ### Routing safety review
 
 - Withdraw the per-turn/full-history routing experiment: Pi 0.85.1 captures the dispatch model/effort before `context`, so switching there routed the actual call on the previous pair. Restore supported pre-submission idle-TUI routing and document excluded prompt sources.
@@ -26,7 +39,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ### Model roles
 
-- Simplify `/model-roles` to Settings, Enable/Disable Auto Selector, and Use-role subcommands. The footer now states `auto-selector=enabled|disabled`; direct role use preserves that state, so enabled routing may choose another role on the next eligible prompt while disabled routing pins the selected/current role.
+- Keep role management focused on Settings, Enable/Disable Auto Selector, and Use-role subcommands, alongside the explicit Run-command wrapper. The footer now states `auto-selector=enabled|disabled`; direct role use preserves that state, so enabled routing may choose another role on the next eligible prompt while disabled routing pins the selected/current role.
 - Put Auto Setup first in Settings and make the remaining role surface CRUD-only, removing use, pause/global-toggle, reload, reset, and status operations from the role dashboard.
 - Open Auto Setup review automatically after research or refinement settles, using a deferred idle callback rather than requiring a separate review command or blocking `agent_settled` dispatch.
 - Strengthen generated role-description guidance as a compact classification prompt: “Use when” observable triggers, near-miss exclusions, and pairwise overlap checks.
