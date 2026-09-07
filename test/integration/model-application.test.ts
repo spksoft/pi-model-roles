@@ -44,6 +44,34 @@ async function harness(overrides: (pi: ExtensionAPI) => Partial<ExtensionAPI> = 
 }
 const input = { type: "input", source: "interactive", text: "Synthetic task" } as const;
 
+for (const text of ["", "  ", "x".repeat(16385)])
+  test(`empty/image-only or oversized input bypasses classification (${text.length} chars)`, {
+    timeout: 5000,
+  }, async () => {
+    const { h, c } = await harness();
+    try {
+      assert.deepEqual(
+        await c.input(
+          {
+            ...input,
+            text,
+            images: [{ type: "image", data: "SYNTHETIC_IMAGE", mimeType: "image/png" }],
+          },
+          h.context,
+        ),
+        { action: "continue" },
+      );
+      assert.equal(h.faux.state.callCount, 0);
+      assert.equal(
+        c.lastDecision?.reason,
+        text.length > 16384 ? "input_too_large" : "insufficient_text",
+      );
+      assert.equal(h.session.model?.id, "default");
+    } finally {
+      await h.close();
+    }
+  });
+
 test("a failed configured default does not mask a usable inherited baseline", async () => {
   const { h, c } = await harness((pi) => ({
     setModel: async (model) => (model.id === "owner/fast" ? false : pi.setModel(model)),

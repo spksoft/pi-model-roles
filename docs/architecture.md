@@ -43,6 +43,8 @@ Settings and Auto Setup
 
 Automatic routing applies only to a new interactive prompt submitted while a primary TUI session is idle. It does not independently reroute tools, retries, steering, queued follow-ups, slash-command expansions, headless sessions, or known subagent children.
 
+This is an explicit host boundary: Pi 0.85.1 snapshots model/effort before its `context` hook. The package does not switch models there or project full conversation history for classification. It selects from submitted task text at `input`, before the supported pre-prompt preparation/dispatch boundary. See [per-turn compatibility](compatibility.md#per-turn-routing-is-not-supported).
+
 ```text
 New eligible prompt
   -> Is there an explicit model/effort choice or a paused session?
@@ -106,7 +108,7 @@ The normal agent may use tools already configured in Pi. The package asks it not
 
 Automatic routing is intentionally limited to the primary interactive Pi session. An SDK host or another extension can call the standalone library or use the versioned process-local event service to obtain a decision, then apply it through its own execution and permission policy. The package does not automatically intercept arbitrary subagent tools, external CLI runners, or remote processes.
 
-The optional pi-subagents example selects before delegation and forwards the selected exact model and effort through the existing launcher. It is not part of ordinary installation. See the [integration API](api.md) for contracts and boundaries.
+The optional pi-subagents example selects before delegation and forwards the selected exact model and effort through the existing launcher. It is not part of ordinary installation. The automatic-background bridge experiment is withdrawn: its compatibility probe returns an unsupported diagnostic without any registration/RPC, and its child entry is inert. Child model-scope authority and a supported per-turn application boundary cannot be inferred from environment bindings. See the [integration API](api.md) for contracts and boundaries.
 
 ## Known boundary
 

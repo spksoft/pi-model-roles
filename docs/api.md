@@ -17,7 +17,7 @@ Auto Setup is intentionally **not** a public research/search API. It is a primar
 | A headless host that wants to offer an event service | `registerSelectionService(...)` | Your host, explicitly. No automatic service is registered. |
 | A separate process or external CLI runner | Build your own explicit integration | Events here are process-local, not a remote protocol. |
 
-Resolve your host's explicit model/effort settings **before requesting selection**. A run or agent configuration must not be silently overridden just because it was omitted from the API request.
+Resolve your host's explicit model/effort settings and permitted-model restrictions **before requesting selection**. Pass pins as `explicitModel`/`explicitEffort` and restrictions as `allowedModels`, which bounds both selector and execution. A run or agent configuration must not be silently overridden just because it was omitted from the API request. If you cannot establish these restrictions through your host's public contracts, keep its launcher unchanged rather than guessing.
 
 ## Library quickstart
 
@@ -158,6 +158,22 @@ Important boundaries:
 - Reload replaces the owner. Disposal cancels outstanding service results and removes its listener. Headless and known-child ambient instances register no automatic owner.
 - `registerSelectionService(bus, sessionId, handler)` lets an opt-in host offer the same service and returns a disposer. The handler must be bounded/cooperative to clean up its own resources.
 - This is advisory and process-local, not a security boundary. Promises and signals cannot be serialized into a remote request.
+
+## Automatic-child compatibility diagnostic
+
+`createPiSubagentsBackgroundBridge(pi: Pick<ExtensionAPI, "events">)` returns `Promise<PiSubagentRoutingDiagnostic>`. It is a fail-closed compatibility probe, **not a launcher**. On the tested Pi 0.85.1 / pi-subagents 0.65.1 contracts it always returns:
+
+```ts
+{
+  status: "unsupported",
+  code: "automatic_child_routing_unsupported",
+  message: "..." // bounded explanation and explicit-selection remediation
+}
+```
+
+There is no `spawn()` or `dispose()` method. No registration, subscription, timer, RPC, provider call, or launch is performed. `piSubagentRoutingDiagnostic(request?)` returns the same result synchronously; optional `{model?: ModelRef, effort?: Effort}` pins are neither inspected, echoed, nor modified. `PI_SUBAGENT_ROUTING_UNSUPPORTED` exports the code. The diagnostic is static, not discovery of an installed owner. See the [host limitation](compatibility.md#per-turn-routing-is-not-supported).
+
+The experimental binding parser, active child entry, and complete-context `SelectionRequest.context` option are not supported public APIs. The source child-entry file is intentionally inert for stale configurations; bindings cannot authorize routing. Primary non-TUI/child sessions remain inactive even when role YAML exists.
 
 ## Optional pi-subagents example
 

@@ -22,3 +22,12 @@ export type {
 } from "./core/types.js";
 export { SELECT_EVENT, registerSelectionService, selectViaEvents } from "./api/events.js";
 export type { SelectionEvent, SelectionEventBus } from "./api/events.js";
+export {
+  PI_SUBAGENT_ROUTING_UNSUPPORTED,
+  createPiSubagentsBackgroundBridge,
+  piSubagentRoutingDiagnostic,
+} from "./integrations/pi-subagents.js";
+export type {
+  PiSubagentRoutingDiagnostic,
+  PiSubagentRoutingRequest,
+} from "./integrations/pi-subagents.js";

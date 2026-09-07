@@ -62,6 +62,8 @@ export default function modelRoles(pi: ExtensionAPI): void {
         (request) => controller.select(ctx, request),
       );
   });
+  // Pi 0.85.1 captures the dispatch model/effort before `context`. Route only
+  // supported idle submissions here; never apply automatic decisions at `context`.
   pi.on("input", (event, ctx) => {
     autoSetup.ordinaryInput(event, ctx);
     return controller.input(event, ctx);

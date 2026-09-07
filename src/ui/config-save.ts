@@ -33,6 +33,6 @@ export async function confirmFirstCustomRoleRouting(
   if (Object.keys(before.roles).length !== 1 || Object.keys(after.roles).length <= 1) return true;
   return ctx.ui.confirm(
     "Enable task-based model selection?",
-    "Each new idle interactive prompt may make one extra request to the default provider (cost and latency). That request includes submitted task text and role descriptions. The selected execution provider receives the normal conversation. No history or images go to the selector.",
+    "Each eligible new idle TUI submission may make one extra request to the default provider (cost and latency). The selector receives submitted task text and role descriptions; history, tool results, image bytes, and loaded system/skill/context files are not automatically collected. Text pasted into the task is included and is not secret-filtered. Tool-loop turns, queued follow-ups, and Auto Setup are not independently rerouted. The execution provider still receives Pi's normal conversation.",
   );
 }

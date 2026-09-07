@@ -9,6 +9,7 @@ import {
 import { ConfigStore } from "../../src/config/store.js";
 import { AUTO_SETUP_TOOL } from "../../src/pi/auto-setup-controller.js";
 import { sdkHarness } from "../support/sdk.js";
+import { config } from "../support/fixtures.js";
 
 const defaultModel = { provider: "fixture", id: "default" };
 const fastModel = { provider: "fixture", id: "owner/fast" };
@@ -103,60 +104,87 @@ test("confirmed Auto Setup save preserves the active model and writes only the r
   }
 });
 
-test("Auto Setup automatically reviews both research and a refined proposal", async () => {
-  const h = await sdkHarness();
-  try {
-    h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel]);
-    h.ui.answers.push(
-      true,
-      "Discuss/refine",
-      "Tighten the role boundary and keep the same evidence.",
-      "Close",
-    );
-    const submit: FauxResponseFactory = (context) => {
-      const message = context.messages.at(-1);
-      const content =
-        message?.role === "user" && Array.isArray(message.content) ? message.content[0] : undefined;
-      const text = content?.type === "text" ? content.text : "";
-      const requestId = JSON.parse(text.match(/requestId\s+("[^"]+")/)?.[1] ?? '""');
-      const generation = Number(text.match(/generation\s+(\d+)/)?.[1]);
-      assert.ok(requestId && generation);
-      return fauxAssistantMessage(
-        [fauxToolCall(AUTO_SETUP_TOOL, { requestId, generation, proposal: offlineProposal() })],
-        { stopReason: "toolUse" },
+for (const routing of ["inherited", "custom", "default-override"] as const)
+  test(`Auto Setup research/refinement preserves the actual pair with ${routing} roles`, {
+    timeout: 5000,
+  }, async () => {
+    const h = await sdkHarness();
+    try {
+      if (routing !== "inherited") {
+        const store = new ConfigStore(h.dir);
+        const snapshot = await store.load();
+        assert.ok(snapshot);
+        const settings = config();
+        if (routing === "default-override") {
+          settings.roles.default = { model: fastModel, effort: "low" };
+          delete settings.roles.fast;
+        }
+        await store.save(settings, snapshot.revision);
+        await h.session.reload();
+      }
+      const calls: Array<{ model: string; effort: string | undefined }> = [];
+      h.ui.customAnswers.push({ type: "auto-setup" }, [defaultModel, fastModel]);
+      h.ui.answers.push(
+        true,
+        "Discuss/refine",
+        "Tighten the role boundary and keep the same evidence.",
+        "Close",
       );
-    };
-    h.respond(
-      submit,
-      fauxAssistantMessage([fauxText("Initial proposal submitted.")]),
-      submit,
-      fauxAssistantMessage([fauxText("Refined proposal submitted.")]),
-    );
+      const submit: FauxResponseFactory = (context, options, _state, model) => {
+        calls.push({ model: model.id, effort: options?.reasoning });
+        const message = context.messages.at(-1);
+        const content =
+          message?.role === "user" && Array.isArray(message.content)
+            ? message.content[0]
+            : undefined;
+        const text = content?.type === "text" ? content.text : "";
+        const requestId = JSON.parse(text.match(/requestId\s+("[^"]+")/)?.[1] ?? '""');
+        const generation = Number(text.match(/generation\s+(\d+)/)?.[1]);
+        assert.ok(requestId && generation);
+        return fauxAssistantMessage(
+          [fauxToolCall(AUTO_SETUP_TOOL, { requestId, generation, proposal: offlineProposal() })],
+          { stopReason: "toolUse" },
+        );
+      };
+      const finish: FauxResponseFactory = (_context, options, _state, model) => {
+        calls.push({ model: model.id, effort: options?.reasoning });
+        return fauxAssistantMessage("Proposal submitted.");
+      };
+      h.respond(submit, finish, submit, finish);
 
-    await h.session.prompt("/model-roles settings");
-    await h.session.waitForIdle();
-    await waitFor(
-      () =>
-        h.faux.state.callCount === 4 &&
-        h.ui.selections.filter((item) => item.title === "Auto Setup proposal").length === 2,
-      "Auto Setup did not finish the automatic review of the refined proposal.",
-    );
+      await h.session.prompt("/model-roles settings");
+      await h.session.waitForIdle();
+      await waitFor(
+        () =>
+          h.faux.state.callCount === 4 &&
+          h.ui.selections.filter((item) => item.title === "Auto Setup proposal").length === 2,
+        "Auto Setup did not finish the automatic review of the refined proposal.",
+      );
 
-    assert.equal(
-      h.faux.state.callCount,
-      4,
-      JSON.stringify({
-        messages: h.session.messages,
-        errors: h.errors,
-        notifications: h.ui.notifications,
-      }),
-    );
-    assert.equal(h.ui.selections.filter((item) => item.title === "Auto Setup proposal").length, 2);
-    assert.deepEqual(h.errors, []);
-  } finally {
-    await h.close();
-  }
-});
+      assert.equal(
+        h.faux.state.callCount,
+        4,
+        JSON.stringify({
+          messages: h.session.messages,
+          errors: h.errors,
+          notifications: h.ui.notifications,
+        }),
+      );
+      assert.equal(
+        h.ui.selections.filter((item) => item.title === "Auto Setup proposal").length,
+        2,
+      );
+      assert.deepEqual(
+        calls,
+        Array.from({ length: 4 }, () => ({ model: "default", effort: "high" })),
+      );
+      assert.equal(h.session.model?.id, "default");
+      assert.equal(h.session.thinkingLevel, "high");
+      assert.deepEqual(h.errors, []);
+    } finally {
+      await h.close();
+    }
+  });
 
 test("automatic Auto Setup review can cancel without a separate review command or configuration write", async () => {
   const h = await sdkHarness();

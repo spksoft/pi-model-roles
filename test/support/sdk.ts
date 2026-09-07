@@ -1,3 +1,4 @@
+import { AssertionError } from "node:assert";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,6 +29,8 @@ export async function sdkHarness(
     mode?: "tui" | "json" | "rpc" | "print";
     child?: boolean;
     tools?: string[];
+    /** Load only synthetic skills provisioned under the isolated fixture directory. */
+    skills?: boolean;
     prepare?: (dir: string, faux: FauxProviderHandle) => Promise<void>;
   } = {},
 ) {
@@ -59,6 +62,7 @@ export async function sdkHarness(
   const ui = fakeUI();
   let context: ExtensionContext | undefined;
   const errors: string[] = [];
+  const providerAssertions: AssertionError[] = [];
   const settings = SettingsManager.inMemory(
     {
       defaultProvider: "fixture",
@@ -75,7 +79,7 @@ export async function sdkHarness(
     settingsManager: settings,
     eventBus: bus,
     noExtensions: true,
-    noSkills: true,
+    noSkills: !options.skills,
     noThemes: true,
     noPromptTemplates: true,
     noContextFiles: true,
@@ -121,7 +125,23 @@ export async function sdkHarness(
       return context;
     },
     respond(...responses: FauxResponseStep[]) {
-      faux.setResponses(responses);
+      // Faux turns callback exceptions into assistant errors. Retain assertion
+      // failures and rethrow outside the provider during cleanup so tests cannot
+      // pass on call counts/session display while dispatch assertions failed.
+      faux.setResponses(
+        responses.map((step) =>
+          typeof step !== "function"
+            ? step
+            : async (...args) => {
+                try {
+                  return await step(...args);
+                } catch (error) {
+                  if (error instanceof AssertionError) providerAssertions.push(error);
+                  throw error;
+                }
+              },
+        ),
+      );
     },
     async close() {
       try {
@@ -134,6 +154,7 @@ export async function sdkHarness(
         else process.env.PI_SUBAGENT_CHILD = previousChild;
         await rm(dir, { recursive: true, force: true });
       }
+      if (providerAssertions.length) throw providerAssertions[0];
     },
   };
 }

@@ -2,7 +2,12 @@
 import assert from "node:assert/strict";
 import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
-import { defaultConfig, selectModelForTask } from "pi-model-roles";
+import {
+  defaultConfig,
+  selectModelForTask,
+  createPiSubagentsBackgroundBridge,
+} from "pi-model-roles";
+import childEntry from "./node_modules/pi-model-roles/dist/integrations/pi-subagents-child.js";
 import extension from "./node_modules/pi-model-roles/dist/extension.js";
 import { createEventBus, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 const sourceLoader = new DefaultResourceLoader({
@@ -33,6 +38,19 @@ const decision = await selectModelForTask(
   },
 );
 assert.equal(decision.status, "selected");
+const untouchedPi = new Proxy(
+  {},
+  {
+    get() {
+      assert.fail("Unsupported bridge touched host API");
+    },
+  },
+);
+assert.equal(
+  (await createPiSubagentsBackgroundBridge(untouchedPi)).code,
+  "automatic_child_routing_unsupported",
+);
+childEntry(untouchedPi);
 const pi = {
   events: createEventBus(),
   registerCommand: (name, command) => commands.set(name, command),

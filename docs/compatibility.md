@@ -2,7 +2,7 @@
 
 [← README](../README.md) · [Architecture](architecture.md) · [Configuration](configuration.md) · [Integration API](api.md)
 
-This is the detailed support and troubleshooting guide. Use this page to check whether your Pi setup is covered, diagnose unexpected routing, and understand known limits. Start with the [GitHub installation instructions](../README.md#install-from-github) if the package is not installed yet.
+This is the detailed support and troubleshooting guide. Use this page to check whether your Pi setup is covered, diagnose unexpected routing, and understand known limits. Start with the [GitHub installation instructions](../README.md#quick-install) if the package is not installed yet.
 
 ## Requirements and tested versions
 
@@ -31,6 +31,16 @@ GitHub install/update/remove syntax follows [Pi's package documentation](https:/
 | Other subagent tools or external CLI runners | No universal interception or automatic model translation. Require an explicit integration. |
 
 The package uses Pi's cached model availability and capabilities. It does not probe providers on each task, change authentication, or bypass model scope and launcher permissions. Structurally valid roles can remain saved even when their models are temporarily unavailable.
+
+## Per-turn routing is not supported
+
+On tested **Pi 0.85.1**, the `context` event runs after the agent loop captures the request's model and thinking effort, and before Pi converts its internal messages to provider messages. Calling `pi.setModel()` there changes session state but not that request's captured pair. A selector can appear to work in the footer while execution uses the previous pair.
+
+The experimental context hook and full-history projector have therefore been withdrawn. Routing stays at the supported idle primary-TUI `input` boundary, before model/authentication checks and pre-prompt compaction. Tool loops, queued work, slash/skill expansion, Auto Setup, non-TUI modes, and children are not independently rerouted. No lossy substitute for full-context routing is used and no dependency is patched.
+
+Automatic child routing also lacks a public way to carry pi-subagents' resolved model-scope authority into this extension. `createPiSubagentsBackgroundBridge(pi)` always returns `unsupported/automatic_child_routing_unsupported`; it does not register an agent, subscribe, start a timer, or emit RPC/spawn requests—even with a compatible owner. The withdrawn child entry stays inert regardless of environment bindings. This avoids changing extension-loading policy, escaping model restrictions, or abandoning a late-accepted launch. Use [explicit selection before an existing launcher](api.md#optional-pi-subagents-example), providing resolved pins and permitted models before selection; the launcher retains final authority.
+
+The per-turn plan under `docs/plan/` is a historical proposal whose host assumptions did not hold, not a supported feature. If you ran the experiment, reload the package, check/reselect the intended model and effort, and explicitly enable routing only when wanted; no role YAML migration is required.
 
 ## Auto Setup boundary
 
@@ -125,7 +135,7 @@ After building, load a development extension for one run with `pi -e ./dist/exte
 npm pack --ignore-scripts
 ```
 
-For version 0.1.0 this produces `pi-model-roles-0.1.0.tgz`. It includes compiled code, declarations, examples, and the maintained user guides, with no install/postinstall build. Normal users should follow the [GitHub installation guide](../README.md#install-from-github).
+For version 0.1.0 this produces `pi-model-roles-0.1.0.tgz`. It includes compiled code, declarations, examples, and the maintained user guides, with no install/postinstall build. Normal users should follow the [GitHub installation guide](../README.md#quick-install).
 
 ### What automated checks cover
 
@@ -140,7 +150,8 @@ Coverage includes:
 - Smaller-context model selection before Pi compaction using a fake transport; this does not establish live-provider compaction behavior.
 - Native dialog draft cancellation, role management, explicit role use, resume, reset, and session-targeted event isolation/disposal.
 - Real component keyboard input through SDK role creation/edit/default flows with a large three-provider fake catalog; shared picker pagination, fuzzy queries, exact refs, inherited default, multi-selection persistence, terminal-size render bounds, and focus forwarding.
-- Native pi-subagents model/effort forwarding and parent isolation, with an isolated `PI_SUBAGENTS_TEMP_ROOT` and no alternative launcher fallback.
+- Native foreground pi-subagents model/effort forwarding and parent isolation, with an isolated `PI_SUBAGENTS_TEMP_ROOT` and no alternative launcher fallback. Automatic-background compatibility checks assert rejection with no registration/RPC; they do not claim background child execution.
+- Actual dispatch model/effort and successful assistant responses across alternating selections, Auto Setup with existing custom/overridden-default roles, and task-only selector privacy after real skill expansion and file tool results. The SDK harness rethrows faux-provider callback assertion failures outside the provider so they cannot silently pass.
 - Prebuilt tarball contents, production-only offline installation, plain-Node library/extension loading without development tooling, and YAML retention after package removal.
 
 The packaging smoke test validates a **locally built tarball**, not a live GitHub fetch or a public registry release. Test results do not prove real-provider latency, cross-provider service behavior, or support for untested Pi versions.

@@ -1,0 +1,2020 @@
+<!doctype html>
+<html lang="en" data-plan-format="pi-plan-html-v1">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Implementation plan: Per-turn model routing across Pi prompt sources"
+    />
+    <meta
+      name="plan-digest"
+      content="8ab4e63149f73ff9d6d2ed918e77facafdd2aa77937d712a9ddbb91fafd5f101"
+    />
+    <title>
+      Per-turn model routing across Pi prompt sources — Implementation Plan
+    </title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fb;
+        --surface: #fff;
+        --ink: #182235;
+        --muted: #647087;
+        --line: #dbe2ec;
+        --brand: #4b3bc8;
+        --soft: #efedff;
+        --good: #08744b;
+        --good-bg: #e8f7ef;
+        --warn: #8a5900;
+        --warn-bg: #fff3d7;
+        --bad: #a12b34;
+        --bad-bg: #fff0f1;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          16px/1.62 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      .shell {
+        width: min(1040px, calc(100% - 2rem));
+        margin: auto;
+      }
+      header {
+        padding: 4rem 0 2.6rem;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(135deg, #fff, #f0eeff);
+      }
+      main {
+        padding: 2.5rem 0 4rem;
+      }
+      section {
+        margin: 0 0 3rem;
+      }
+      h1 {
+        max-width: 850px;
+        margin: 0.2rem 0;
+        font-size: clamp(2.2rem, 6vw, 4.2rem);
+        line-height: 1.05;
+        letter-spacing: -0.05em;
+      }
+      h2 {
+        margin: 0 0 1rem;
+        font-size: 1.75rem;
+        letter-spacing: -0.03em;
+      }
+      h3 {
+        margin: 0.1rem 0 0.5rem;
+        line-height: 1.25;
+      }
+      h4 {
+        margin: 1.2rem 0 0.4rem;
+      }
+      h5 {
+        margin: 0.8rem 0 0.25rem;
+      }
+      .eyebrow,
+      .task-id {
+        margin: 0;
+        color: var(--brand);
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .lede {
+        max-width: 780px;
+        color: var(--muted);
+        font-size: 1.1rem;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+      .tag {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 99px;
+        background: var(--soft);
+        color: var(--brand);
+        font-size: 0.72rem;
+        font-weight: 800;
+      }
+      .tag.good {
+        background: var(--good-bg);
+        color: var(--good);
+      }
+      .tag.warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .tag.bad {
+        background: var(--bad-bg);
+        color: var(--bad);
+      }
+      .main-idea {
+        padding: 1.2rem 1.3rem;
+        border: 1px solid #d1cbff;
+        border-left: 5px solid var(--brand);
+        border-radius: 14px;
+        background: var(--soft);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+      }
+      .card,
+      .task,
+      .subtasks article {
+        padding: 1.15rem;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: var(--surface);
+      }
+      .task {
+        margin-bottom: 1rem;
+        border-left: 5px solid var(--brand);
+      }
+      .task-head {
+        display: flex;
+        gap: 0.8rem;
+        align-items: flex-start;
+      }
+      .step {
+        display: grid;
+        min-width: 2rem;
+        height: 2rem;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--soft);
+        color: var(--brand);
+        font-weight: 800;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: 5rem 1fr;
+        gap: 0.5rem 1rem;
+        margin: 1rem 0;
+      }
+      dt {
+        color: var(--brand);
+        font-weight: 850;
+      }
+      dd {
+        margin: 0;
+      }
+      .architecture-figure {
+        margin: 1rem 0 0;
+        padding: 1rem;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: #f9faff;
+        overflow: auto;
+      }
+      .architecture-figure figcaption {
+        margin-bottom: 0.75rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 800;
+      }
+      .architecture-diagram {
+        margin: 0;
+        white-space: pre;
+        overflow: auto;
+      }
+      .architecture-diagram svg {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: auto;
+        white-space: normal;
+      }
+      .muted,
+      small {
+        color: var(--muted);
+      }
+      .subtasks {
+        display: grid;
+        gap: 1rem;
+        padding-left: 1.5rem;
+      }
+      .subtasks li {
+        padding-left: 0.25rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+      }
+      th,
+      td {
+        padding: 0.75rem;
+        border: 1px solid var(--line);
+        vertical-align: top;
+        text-align: left;
+      }
+      th {
+        background: #f0f3f8;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+      }
+      code {
+        padding: 0.1rem 0.3rem;
+        border-radius: 5px;
+        background: #eef1f6;
+      }
+      footer {
+        padding: 1.5rem 0;
+        border-top: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+      @media (max-width: 700px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        dl {
+          grid-template-columns: 1fr;
+        }
+        header {
+          padding-top: 2.5rem;
+        }
+      }
+      @media print {
+        body {
+          background: #fff;
+        }
+        .card,
+        .task,
+        .subtasks article,
+        .architecture-figure {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="shell">
+        <p class="eyebrow">Historical proposal — withdrawn after review</p>
+        <p>
+          <strong>Not implemented as specified (2026-09-07).</strong> Pi 0.85.1
+          captures model/effort before the context event; pi-subagents 0.65.1
+          does not establish child model-scope authority for this extension.
+          Supported routing remains idle primary-TUI submission with task-only
+          data. The automatic-child compatibility probe returns unsupported
+          without launching. See
+          <a href="../compatibility.md#per-turn-routing-is-not-supported"
+            >current compatibility guidance</a
+          >. The proposal and original hash below are retained for history, not
+          as a completion claim.
+        </p>
+        <h1>Per-turn model routing across Pi prompt sources</h1>
+        <p class="lede">
+          Expand enabled model-role routing from idle TUI input to every
+          eligible primary Pi LLM request, using complete live textual message
+          context and a narrowly opt-in native pi-subagents background-child
+          bridge.
+        </p>
+        <div class="meta">
+          <span class="tag">per-turn-model-routing-pi-subagents</span
+          ><span class="tag">sha256:8ab4e63149f7</span>
+        </div>
+      </div>
+    </header>
+    <main class="shell">
+      <section>
+        <div class="main-idea">
+          <h2>Outcome</h2>
+          <p>
+            Enabled routing makes a deterministic decision immediately before
+            each eligible LLM request; it excludes image bytes and
+            system/context-file material, never truncates oversized routing
+            input, preserves explicit choices, and falls back safely.
+          </p>
+          <h3>Acceptance criteria</h3>
+          <ul>
+            <li>
+              Every configured primary Pi agent mode routes each eligible
+              provider-bound LLM turn, including expanded prompts, queued work,
+              retries, and tool-loop turns; non-LLM host/slash commands do not
+              invoke selection.
+            </li>
+            <li>
+              Selector input is a deterministic full textual projection of
+              provider-ready user, assistant/reasoning, tool-call, and
+              tool-result text with typed boundaries; it excludes image bytes,
+              assembled system prompts, AGENTS.md, skills, and context files.
+            </li>
+            <li>
+              Oversized full context is never truncated or summarized: selection
+              is skipped and configured-default → baseline → current fallback
+              leaves the LLM call executable.
+            </li>
+            <li>
+              Manual model/effort changes, explicit selection API requests,
+              explicit pi-subagents per-run/agent pins, and stale/cancelled
+              lifecycle work cannot be overwritten by automatic routing.
+            </li>
+            <li>
+              Automatic child routing runs only through a positively identified
+              unpinned native pi-subagents background-child bridge; foreground,
+              unbound, pinned, and external paths are untouched and get
+              actionable guidance.
+            </li>
+            <li>
+              Tests and documentation cover lifecycle sources, context
+              privacy/limits, image eligibility, races/fallbacks, supported
+              child routing, and unsupported/pinned paths.
+            </li>
+          </ul>
+        </div>
+      </section>
+      <section>
+        <h2>Scope and constraints</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>In scope</h3>
+            <ul>
+              <li>
+                Primary Pi lifecycle routing in TUI and non-TUI agent modes with
+                valid enabled configuration.
+              </li>
+              <li>
+                Text-only provider-ready message projection, per-turn
+                cancellation/application/persistence safety, and existing
+                model/image eligibility.
+              </li>
+              <li>
+                A public optional native pi-subagents background-child bridge
+                built solely on public contracts.
+              </li>
+              <li>
+                Tests, README, guides, changelog, compatibility information, and
+                manual checklist.
+              </li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Out of scope</h3>
+            <ul>
+              <li>
+                Pi, pi-subagents, provider, dependency, or node_modules changes.
+              </li>
+              <li>
+                Universal interception of arbitrary pi-subagents launches,
+                foreground children, unbound native children, or external
+                runners.
+              </li>
+              <li>
+                Image bytes, assembled system prompts, AGENTS.md, skills,
+                context files, credentials, or raw routing context persistence.
+              </li>
+              <li>
+                Lossy truncation, summarization, routing logs, or network
+                discovery on the routing path.
+              </li>
+              <li>
+                Role YAML schema migration or weakened explicit-model
+                precedence.
+              </li>
+            </ul>
+          </article>
+        </div>
+        <article class="card" style="margin-top: 1rem">
+          <h3>Constraints</h3>
+          <ul>
+            <li>Implement only inside pi-model-roles.</li>
+            <li>
+              Keep selection deterministic, provider-agnostic, bounded, and
+              backward-compatible for public selection callers.
+            </li>
+            <li>Routing failure must not prevent a usable LLM call.</li>
+            <li>
+              Use only documented pi-subagents contracts; do not parse private
+              configuration/source or infer undocumented pin provenance.
+            </li>
+            <li>
+              Continue image-capability enforcement while omitting image data
+              from classifier requests.
+            </li>
+            <li>
+              Never serialize prompt/context text in decision metadata,
+              configuration, diagnostics, fixtures, or docs.
+            </li>
+          </ul>
+        </article>
+      </section>
+      <section>
+        <h2>Research findings</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Current routing is submission-only.</h3>
+            <ul>
+              <li>
+                `src/pi/controller.ts` `input()` accepts only idle interactive
+                non-slash TUI input and constructs a request from `event.text`.
+              </li>
+              <li>
+                `src/extension.ts` delegates only its `input` lifecycle hook to
+                controller routing.
+              </li>
+              <li>
+                Pi extension docs specify `context` fires before each LLM call
+                with provider-ready messages.
+              </li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Core selection already provides bounded safe fallback.</h3>
+            <ul>
+              <li>
+                `src/core/selection.ts` handles timeout, cancellation,
+                availability, selector-window checks, and
+                configured-default/baseline/current fallback.
+              </li>
+              <li>
+                `src/core/defaults.ts` defines a 16,384-character task cap.
+              </li>
+              <li>
+                `src/pi/controller.ts` `apply()` revalidates models and guards
+                stale/manual model-switch races.
+              </li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>
+              The requested data flow expands current task-only privacy
+              semantics.
+            </h3>
+            <ul>
+              <li>
+                `src/core/classifier-protocol.ts` currently serializes only role
+                descriptions and `task`.
+              </li>
+              <li>
+                README and configuration documentation currently promise
+                submitted-task text rather than history.
+              </li>
+              <li>
+                Pi `before_agent_start` exposes assembled system
+                prompt/context-file details, but the agreed boundary expressly
+                excludes them.
+              </li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>
+              pi-subagents has public opt-in seams but no universal safe child
+              interception point.
+            </h3>
+            <ul>
+              <li>
+                Its docs expose runtime-agent registration, in-process RPC,
+                structured delegation, and extensionBindings as public seams.
+              </li>
+              <li>
+                Its documented precedence places per-run and agent model
+                overrides over inherited/default models.
+              </li>
+              <li>
+                Its child-launch contract makes extension bindings available to
+                native background runners, not foreground children, and external
+                runners do not support them.
+              </li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Credential-free real lifecycle coverage exists.</h3>
+            <ul>
+              <li>
+                `test/support/sdk.ts` creates a real Pi SDK AgentSession and
+                faux provider.
+              </li>
+              <li>
+                `test/integration/lifecycle.test.ts` covers reload, manual mode,
+                cancellation, and modes.
+              </li>
+              <li>
+                `test/integration/pi-subagents.test.ts` uses the optional
+                package&#39;s public event contract.
+              </li>
+            </ul>
+          </article>
+        </div>
+      </section>
+      <section>
+        <h2>Architecture design</h2>
+        <article class="card">
+          <p>
+            A pure context projector feeds the existing pure selector. A
+            session-owned coordinator runs from Pi&#39;s pre-provider context
+            event, aborts obsolete work, safely applies the exact turn&#39;s
+            model, and stores only non-sensitive metadata. An optional bridge
+            grants the same behavior to one owned, unpinned native background
+            child path.
+          </p>
+          <figure class="architecture-figure">
+            <figcaption>Architecture flowchart</figcaption>
+            <pre id="architecture-diagram" class="mermaid architecture-diagram">
+flowchart TD
+  A[Prompt, continuation, retry, or tool loop] --&gt; B[Pi context event before provider request]
+  B --&gt; C[RolesController turn coordinator]
+  C --&gt; D[Deterministic textual message projection]
+  D --&gt; E{Complete projection fits limits?}
+  E -- yes --&gt; F[Bounded selector request]
+  E -- no --&gt; G[Safe default/baseline/current fallback]
+  F --&gt; H[Validate and apply exact turn model]
+  G --&gt; I[Provider request]
+  H --&gt; I
+  J[Manual change, reload, tree, shutdown] --&gt; K[Abort and increment generation]
+  K --&gt; C
+  L[Owned native background pi-subagents bridge] --&gt; M[Validated child binding]
+  M --&gt; C
+  N[Foreground, pinned, unbound, external child] --&gt; O[No interception; diagnostic or explicit API]</pre>
+          </figure>
+        </article>
+      </section>
+      <section>
+        <h2>Implementation tasks</h2>
+        <article class="task" id="task-T1">
+          <div class="task-head">
+            <span class="step">1</span>
+            <div>
+              <p class="task-id">T1</p>
+              <h3>Define a deterministic, private full-context projection</h3>
+            </div>
+          </div>
+          <dl>
+            <dt>What</dt>
+            <dd>
+              Add a pure routing-context layer that converts the complete
+              provider-ready message list into classifier text and returns
+              image/size metadata.
+            </dd>
+            <dt>Why</dt>
+            <dd>
+              Per-turn routing needs complete live textual context, while
+              current selection accepts only submitted task text and must not
+              expose images or system-context material.
+            </dd>
+            <dt>How</dt>
+            <dd>
+              Create a core projector with stable role/block delimiters and
+              field ordering. Include textual user, assistant, reasoning,
+              tool-call arguments, and tool-result/error content; independently
+              detect images for execution model eligibility; omit binary/image
+              payloads. Treat unknown non-text payloads conservatively. Keep
+              system prompt and `before_agent_start` systemPromptOptions outside
+              this interface. Measure the complete projection before selection;
+              add an explicit oversized-context reason and use existing fallback
+              instead of shortening, summarizing, or persisting it. Keep
+              `SelectionRequest.task` compatible for public callers.
+            </dd>
+          </dl>
+          <h5>Files or modules</h5>
+          <ul>
+            <li>src/core/routing-context.ts</li>
+            <li>src/core/types.ts</li>
+            <li>src/core/defaults.ts</li>
+            <li>src/core/classifier-protocol.ts</li>
+            <li>src/core/selection.ts</li>
+            <li>src/pi/session-state.ts</li>
+            <li>test/unit/routing-context.test.ts</li>
+            <li>test/unit/selection.test.ts</li>
+            <li>test/unit/privacy.test.ts</li>
+          </ul>
+          <h5>Depends on</h5>
+          <p class="muted">No predecessor work items.</p>
+          <h5>Validation</h5>
+          <ul>
+            <li>
+              Unit tests cover message/block ordering, multilingual text,
+              reasoning, tool calls, tool results/errors, text-plus-image, and
+              malformed/unknown payloads.
+            </li>
+            <li>
+              Projection tests prove no image bytes, assembled system prompt,
+              context-file contents, or credentials flow to classifier text.
+            </li>
+            <li>
+              Exact-fit and one-unit-over character/byte/window tests prove no
+              partial projection is classified.
+            </li>
+            <li>
+              Decision/session data assertions prove no raw routing text is
+              retained.
+            </li>
+          </ul>
+          <h4>Implementation subtasks</h4>
+          <ol class="subtasks">
+            <li id="task-T1.1">
+              <article>
+                <p class="task-id">T1.1</p>
+                <h5>Specify canonical text and image metadata</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Define the projector&#39;s supported block mapping and
+                    image-presence result.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    The classifier needs unambiguous text boundaries and model
+                    selection still needs image capability facts.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Use explicit labels for message role and block type, stable
+                    JSON-like field order where a block has multiple textual
+                    fields, and a separate boolean/image metadata result without
+                    carrying payload bytes.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>src/core/routing-context.ts</li>
+                  <li>test/unit/routing-context.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <p class="muted">No predecessor work items.</p>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Equal input messages produce byte-identical projection
+                    output.
+                  </li>
+                  <li>
+                    Image-only and mixed-content cases preserve image
+                    eligibility while leaking no bytes.
+                  </li>
+                </ul>
+              </article>
+            </li>
+            <li id="task-T1.2">
+              <article>
+                <p class="task-id">T1.2</p>
+                <h5>Connect complete-input limits to selection decisions</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Extend selection reason/type handling for a complete context
+                    that cannot fit.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    The agreed policy is full context or no classification, not
+                    a lossy approximation.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Add the minimal public reason/docs contract and call the
+                    existing safe fallback chain before the classifier if
+                    character or selector capacity checks fail; leave ordinary
+                    selection API task behavior unchanged.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>src/core/types.ts</li>
+                  <li>src/core/defaults.ts</li>
+                  <li>src/core/classifier-protocol.ts</li>
+                  <li>src/core/selection.ts</li>
+                  <li>test/unit/selection.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T1.1</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Fallback model ordering matches existing configured default,
+                    baseline, then current behavior.
+                  </li>
+                  <li>
+                    Classifier mock is not called for rejected complete
+                    projections.
+                  </li>
+                </ul>
+              </article>
+            </li>
+          </ol>
+        </article>
+        <article class="task" id="task-T2">
+          <div class="task-head">
+            <span class="step">2</span>
+            <div>
+              <p class="task-id">T2</p>
+              <h3>
+                Route from Pi&#39;s pre-provider lifecycle on every primary turn
+              </h3>
+            </div>
+          </div>
+          <dl>
+            <dt>What</dt>
+            <dd>
+              Refactor controller state from interactive input submission
+              routing into a session-scoped context-turn coordinator and
+              register it with Pi lifecycle events.
+            </dd>
+            <dt>Why</dt>
+            <dd>
+              Pi&#39;s `input` hook misses skill/template expansion and all
+              later turns; `context` is the documented hook immediately before
+              every LLM provider call.
+            </dd>
+            <dt>How</dt>
+            <dd>
+              Add `turn_start`/`context` lifecycle wiring in `src/extension.ts`.
+              Refactor `RolesController` to build a full-context request, select
+              once, and apply only a live session/generation token. Decouple
+              activation from TUI for primary agent modes while keeping
+              missing/default-only configuration non-invasive. Replace
+              active-agent modal loader use with status-safe behavior. Retain
+              input processing only for Auto Setup/ordinary input. Ensure every
+              request carries actual current state, baseline, manual/disabled
+              status, and image requirement. Preserve `setPair` expected-change
+              handling and make session state/decision recording non-sensitive
+              and deduplicated.
+            </dd>
+          </dl>
+          <h5>Files or modules</h5>
+          <ul>
+            <li>src/pi/controller.ts</li>
+            <li>src/pi/session-state.ts</li>
+            <li>src/pi/adapters.ts</li>
+            <li>src/extension.ts</li>
+            <li>src/ui/selection-loader.ts</li>
+            <li>test/integration/lifecycle.test.ts</li>
+            <li>test/integration/context-and-queue.test.ts</li>
+            <li>test/support/sdk.ts</li>
+          </ul>
+          <h5>Depends on</h5>
+          <ul>
+            <li>T1.2</li>
+          </ul>
+          <h5>Validation</h5>
+          <ul>
+            <li>
+              Real SDK tests assert selector then execution-model ordering for
+              initial expanded work and later tool-loop turns.
+            </li>
+            <li>
+              Configured TUI, print, JSON, and RPC primary sessions route actual
+              LLM calls; absent/default-only config stays non-disruptive.
+            </li>
+            <li>
+              Queued continuation, retry, programmatic prompt, and tool-loop
+              cases route only when a provider request occurs.
+            </li>
+            <li>
+              Slash/extension commands without an LLM call make no selector
+              request.
+            </li>
+          </ul>
+          <h4>Implementation subtasks</h4>
+          <ol class="subtasks">
+            <li id="task-T2.1">
+              <article>
+                <p class="task-id">T2.1</p>
+                <h5>Coordinate turns, cancellation, and stale application</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Create per-turn abort ownership separate from old
+                    interactive pending state.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    Selection and model application await points otherwise
+                    permit stale work after manual choices or lifecycle
+                    transitions.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Track current session ID, generation, and turn abort
+                    controller; cancel on reload, tree, shutdown, manual
+                    model/effort change, and relevant replacement. Recheck
+                    authority before/after selection and apply; preserve finite
+                    fallback and do not open UI prompts while an agent is
+                    active.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>src/pi/controller.ts</li>
+                  <li>src/extension.ts</li>
+                  <li>test/integration/lifecycle.test.ts</li>
+                  <li>test/integration/context-and-queue.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T1.2</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Delayed selection/application race tests cover manual
+                    change, reload, tree, shutdown, and cancellation without
+                    leaving stale model/effort selected.
+                  </li>
+                  <li>
+                    Timeout, selector error, and cancellation still allow the
+                    provider call with safe fallback/current state.
+                  </li>
+                </ul>
+              </article>
+            </li>
+            <li id="task-T2.2">
+              <article>
+                <p class="task-id">T2.2</p>
+                <h5>Persist only useful non-sensitive per-turn state</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Adapt status, restore markers, and decision entries for
+                    repeated routing.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    Tool loops may repeat a role decision; session restore needs
+                    state without creating a context log or duplicate churn.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Compare effective model/effort and deduplicate unchanged
+                    decision/state entries. Persist only existing model, effort,
+                    role, reason, warnings, and selector usage metadata.
+                    Preserve manual pause and explicit `/model-roles use`
+                    precedence.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>src/pi/controller.ts</li>
+                  <li>src/pi/session-state.ts</li>
+                  <li>test/integration/lifecycle.test.ts</li>
+                  <li>test/unit/privacy.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T2.1</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Multi-turn tests show no projected text in custom entries
+                    and no duplicate unchanged records.
+                  </li>
+                  <li>
+                    Reload/tree tests retain current mode, baseline, and safe
+                    role semantics.
+                  </li>
+                </ul>
+              </article>
+            </li>
+          </ol>
+        </article>
+        <article class="task" id="task-T3">
+          <div class="task-head">
+            <span class="step">3</span>
+            <div>
+              <p class="task-id">T3</p>
+              <h3>
+                Implement an opt-in native pi-subagents background-child bridge
+              </h3>
+            </div>
+          </div>
+          <dl>
+            <dt>What</dt>
+            <dd>
+              Create a public optional bridge and child entry that enable
+              automatic per-turn routing only for an owned, unpinned native
+              background child.
+            </dd>
+            <dt>Why</dt>
+            <dd>
+              Explicit per-run and agent pins must win, and pi-subagents exposes
+              no safe universal interception hook for arbitrary child launches.
+            </dd>
+            <dt>How</dt>
+            <dd>
+              Use only documented public runtime-agent
+              registration/RPC/extension-binding contracts, without a production
+              runtime dependency on pi-subagents. Parent bridge
+              capability-checks the owner, creates a generated per-session
+              route-owned native agent with no model/effort pin, launches only
+              the supported background path with a versioned `pi-model-roles/1`
+              authority binding, and explicitly loads the child entry. The child
+              validates binding before enabling print-mode controller routing.
+              Reject or diagnose unavailable owner, bad protocol/binding,
+              model/effort pin, foreground mode, external runner, and unowned
+              paths; direct callers retain `selectViaEvents` as the explicit
+              alternative.
+            </dd>
+          </dl>
+          <h5>Files or modules</h5>
+          <ul>
+            <li>src/integrations/pi-subagents.ts</li>
+            <li>src/integrations/pi-subagents-child.ts</li>
+            <li>src/index.ts</li>
+            <li>src/extension.ts</li>
+            <li>examples/pi-subagents.ts</li>
+            <li>package.json</li>
+            <li>test/integration/pi-subagents.test.ts</li>
+            <li>test/support/sdk.ts</li>
+          </ul>
+          <h5>Depends on</h5>
+          <ul>
+            <li>T2.2</li>
+          </ul>
+          <h5>Validation</h5>
+          <ul>
+            <li>
+              Optional-package integration launches a valid owned native
+              background child and observes per-turn child selection before
+              execution.
+            </li>
+            <li>
+              Explicit per-run and agent-pinned routes remain preserved/rejected
+              rather than rerouted.
+            </li>
+            <li>
+              Foreground, unbound native, and external/unsupported paths never
+              activate child routing and return actionable diagnostics.
+            </li>
+            <li>Bridge import/use works with pi-subagents absent.</li>
+          </ul>
+          <h4>Implementation subtasks</h4>
+          <ol class="subtasks">
+            <li id="task-T3.1">
+              <article>
+                <p class="task-id">T3.1</p>
+                <h5>Define parent bridge authority and diagnostics</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Implement versioned binding/capability validation and a
+                    public result contract.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    Positive route authority must be explicit and auditable
+                    rather than guessed from child environment or model state.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Require generated owned-agent identity, exact binding
+                    namespace/version, native-background capability, and no
+                    supplied model/effort; return bounded non-sensitive
+                    reason/remediation values for unsupported states.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>src/integrations/pi-subagents.ts</li>
+                  <li>src/core/types.ts</li>
+                  <li>src/index.ts</li>
+                  <li>test/integration/pi-subagents.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T2.2</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Fixtures cover no owner, malformed response, bad
+                    capabilities/binding, pin input, and successful authority.
+                  </li>
+                  <li>
+                    Type/package checks prove no optional dependency becomes
+                    required at runtime.
+                  </li>
+                </ul>
+              </article>
+            </li>
+            <li id="task-T3.2">
+              <article>
+                <p class="task-id">T3.2</p>
+                <h5>Gate child activation on validated route authority</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Implement a separate child extension entry that uses shared
+                    turn routing only when the bridge binding is valid.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    `PI_SUBAGENT_CHILD` or ambient extension loading alone
+                    cannot prove a child is unpinned.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Strictly parse the bound JSON, initialize cleanup-scoped
+                    child controller state only for supported background print
+                    hosts, and leave foreground and unbound hosts inactive.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>src/integrations/pi-subagents-child.ts</li>
+                  <li>src/pi/controller.ts</li>
+                  <li>src/extension.ts</li>
+                  <li>test/integration/pi-subagents.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T3.1</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    No-binding child case makes zero selection requests; valid
+                    binding routes each child LLM turn.
+                  </li>
+                  <li>
+                    Child cancellation/shutdown releases local state and cannot
+                    affect parent controller state.
+                  </li>
+                </ul>
+              </article>
+            </li>
+          </ol>
+        </article>
+        <article class="task" id="task-T4">
+          <div class="task-head">
+            <span class="step">4</span>
+            <div>
+              <p class="task-id">T4</p>
+              <h3>Align documentation, examples, and compatibility claims</h3>
+            </div>
+          </div>
+          <dl>
+            <dt>What</dt>
+            <dd>
+              Update user and maintainer docs for per-turn cost/data flow,
+              full-context limits, and narrow pi-subagents support.
+            </dd>
+            <dt>Why</dt>
+            <dd>
+              Existing docs promise task-only data and one selector request
+              before a new prompt, which becomes inaccurate.
+            </dd>
+            <dt>How</dt>
+            <dd>
+              Revise README, configuration limit/privacy/recovery sections,
+              architecture flow, API docs, compatibility matrix, changelog,
+              example, and manual checklist. Explain that every LLM turn may add
+              a selector request; full textual user/assistant/reasoning/tool
+              content can be sent to the configured selector; system/context
+              files and image bytes are excluded; oversize input falls back
+              without truncation; and bridge-only child routing preserves pins.
+              Document explicit selection API remediation for excluded paths.
+            </dd>
+          </dl>
+          <h5>Files or modules</h5>
+          <ul>
+            <li>README.md</li>
+            <li>docs/configuration.md</li>
+            <li>docs/architecture.md</li>
+            <li>docs/api.md</li>
+            <li>docs/compatibility.md</li>
+            <li>CHANGELOG.md</li>
+            <li>examples/pi-subagents.ts</li>
+            <li>test/manual/tui-checklist.md</li>
+          </ul>
+          <h5>Depends on</h5>
+          <ul>
+            <li>T3.2</li>
+          </ul>
+          <h5>Validation</h5>
+          <ul>
+            <li>Documentation/package tests and link checks pass.</li>
+            <li>
+              No documentation still claims task-only or one-per-new-prompt
+              automatic selection.
+            </li>
+            <li>
+              Supported bridge example and every unsupported-path remediation
+              match the implemented public contract.
+            </li>
+          </ul>
+          <h4>Implementation subtasks</h4>
+          <ol class="subtasks">
+            <li id="task-T4.1">
+              <article>
+                <p class="task-id">T4.1</p>
+                <h5>
+                  Document lifecycle, privacy, cost, and fallback behavior
+                </h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Replace submission-time routing language with exact
+                    per-provider-turn behavior.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    Users need informed consent and predictable behavior in
+                    long/tool-heavy sessions.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    State inclusion/exclusion lists, no persistence/logging
+                    guarantee, image enforcement, no-truncation policy, safe
+                    fallback ordering, and selector cost implications.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>README.md</li>
+                  <li>docs/configuration.md</li>
+                  <li>docs/architecture.md</li>
+                  <li>CHANGELOG.md</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T2.2</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Review confirms all limits/privacy examples match
+                    implementation and contain no sensitive content.
+                  </li>
+                </ul>
+              </article>
+            </li>
+            <li id="task-T4.2">
+              <article>
+                <p class="task-id">T4.2</p>
+                <h5>Document child bridge limits and alternatives</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Publish setup, capability requirements, diagnostics, pin
+                    precedence, and explicit API alternative.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    The bridge must not be mistaken for universal subagent
+                    interception.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Add API example and compatibility table for owned native
+                    background, pinned, foreground, unbound, and external paths;
+                    link `selectViaEvents` for controlled pre-launch selection.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>docs/api.md</li>
+                  <li>docs/compatibility.md</li>
+                  <li>README.md</li>
+                  <li>examples/pi-subagents.ts</li>
+                  <li>test/manual/tui-checklist.md</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T3.2</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Each excluded path has a concrete safe next action and is
+                    not claimed as automatically routed.
+                  </li>
+                </ul>
+              </article>
+            </li>
+          </ol>
+        </article>
+        <article class="task" id="task-T5">
+          <div class="task-head">
+            <span class="step">5</span>
+            <div>
+              <p class="task-id">T5</p>
+              <h3>Execute quality gates and regression matrix</h3>
+            </div>
+          </div>
+          <dl>
+            <dt>What</dt>
+            <dd>
+              Run the repository formatter, type checker, linter, tests,
+              documentation checks, and diagnostics after implementation.
+            </dd>
+            <dt>Why</dt>
+            <dd>
+              The change crosses public types, Pi lifecycle behavior, optional
+              integrations, and privacy guarantees.
+            </dd>
+            <dt>How</dt>
+            <dd>
+              Extend faux-provider fixtures only as needed for expanded
+              prompt/multiple-turn/child-binding behavior. Run targeted tests
+              during work, then scripts in `package.json`; run LSP/lens
+              diagnostics and inspect final diff for leaked context in
+              tests/docs.
+            </dd>
+          </dl>
+          <h5>Files or modules</h5>
+          <ul>
+            <li>package.json</li>
+            <li>test/support/sdk.ts</li>
+            <li>test/support/fixtures.ts</li>
+            <li>test/unit/routing-context.test.ts</li>
+            <li>test/integration/lifecycle.test.ts</li>
+            <li>test/integration/context-and-queue.test.ts</li>
+            <li>test/integration/pi-subagents.test.ts</li>
+            <li>test/unit/documentation.test.ts</li>
+          </ul>
+          <h5>Depends on</h5>
+          <ul>
+            <li>T4.2</li>
+          </ul>
+          <h5>Validation</h5>
+          <ul>
+            <li>
+              All documented package scripts for formatting, lint, types, tests,
+              and docs/package assertions pass.
+            </li>
+            <li>
+              Targeted lifecycle and optional pi-subagents tests pass without
+              live credentials.
+            </li>
+            <li>
+              LSP/lens diagnostics show no blocking errors in edited files.
+            </li>
+            <li>
+              Final privacy review finds no raw prompt/context in output,
+              fixtures, session expectations, diagnostics, or docs.
+            </li>
+          </ul>
+          <h4>Implementation subtasks</h4>
+          <ol class="subtasks">
+            <li id="task-T5.1">
+              <article>
+                <p class="task-id">T5.1</p>
+                <h5>Expand deterministic real-SDK lifecycle fixtures</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Assert selector/execution ordering over repeated provider
+                    calls without network/timing dependence.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    Coverage must prove source and turn completeness, not infer
+                    it from a single interactive prompt.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Add explicit faux response sequences/event observations for
+                    expansion, tool loops, queued execution, errors/retries, and
+                    multiple modes.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>test/support/sdk.ts</li>
+                  <li>test/integration/lifecycle.test.ts</li>
+                  <li>test/integration/context-and-queue.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T2.2</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Tests assert selector and execution count/model for every
+                    eligible turn.
+                  </li>
+                  <li>Race tests remain repeatable.</li>
+                </ul>
+              </article>
+            </li>
+            <li id="task-T5.2">
+              <article>
+                <p class="task-id">T5.2</p>
+                <h5>Verify bridge and no-leak matrix</h5>
+                <dl>
+                  <dt>What</dt>
+                  <dd>
+                    Exercise optional public contracts and privacy boundaries
+                    together.
+                  </dd>
+                  <dt>Why</dt>
+                  <dd>
+                    The bridge is compatibility-sensitive and full-text routing
+                    raises privacy regression risk.
+                  </dd>
+                  <dt>How</dt>
+                  <dd>
+                    Use public pi-subagents events/RPC only; add
+                    pin/unsupported/no-binding assertions and scan
+                    classifier/decision/session test data for raw text.
+                  </dd>
+                </dl>
+                <h5>Files or modules</h5>
+                <ul>
+                  <li>test/integration/pi-subagents.test.ts</li>
+                  <li>test/unit/privacy.test.ts</li>
+                  <li>test/unit/documentation.test.ts</li>
+                </ul>
+                <h5>Depends on</h5>
+                <ul>
+                  <li>T3.2</li>
+                  <li>T4.2</li>
+                </ul>
+                <h5>Validation</h5>
+                <ul>
+                  <li>
+                    Dependency absence yields documented graceful behavior.
+                  </li>
+                  <li>
+                    Pin, unsupported, invalid-binding, and no-log assertions
+                    pass.
+                  </li>
+                </ul>
+              </article>
+            </li>
+          </ol>
+        </article>
+      </section>
+      <section>
+        <h2>Required risk controls</h2>
+        <article class="main-idea">
+          <h3>
+            Completion gate: no unmitigated high-severity implementation risk
+          </h3>
+          <p>
+            The implementation is not complete unless every control below is
+            implemented and verified. The design fails closed: it refuses
+            unsafe, stale, oversized, unsupported, or unverifiable routing and
+            lets Pi continue with its safe configured-default → baseline →
+            current model path.
+          </p>
+          <ul>
+            <li>
+              <strong>Privacy and cost:</strong> disclose per-turn selector
+              traffic, exclude system/context-file material and image bytes,
+              never persist or log projections, and skip classification when
+              bounds are exceeded.
+            </li>
+            <li>
+              <strong>Correctness:</strong> abort obsolete work on manual
+              changes, reload, tree navigation, shutdown, cancellation, or
+              replacement turns; revalidate immediately before applying a model.
+            </li>
+            <li>
+              <strong>Compatibility:</strong> gate the bridge on documented
+              capability/version checks; reject pinned, foreground, unbound,
+              external, malformed, or unknown paths with actionable diagnostics.
+            </li>
+            <li>
+              <strong>Rollback:</strong> keep the existing enabled/disabled
+              control as the primary kill switch, make the bridge independently
+              disableable, and allow every routing failure to proceed with the
+              current safe model.
+            </li>
+          </ul>
+        </article>
+      </section>
+      <section>
+        <h2>Engineering considerations</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>architecture</h3>
+            <p>
+              Keep projection pure and provider-agnostic; isolate lifecycle and
+              child integration from core selection policy.
+            </p>
+          </article>
+          <article class="card">
+            <h3>security</h3>
+            <p>
+              Treat message text as sensitive; exclude system/context/image
+              data, validate bindings, avoid logs/persistence, and fail closed
+              on unknown authority.
+            </p>
+          </article>
+          <article class="card">
+            <h3>data-and-migrations</h3>
+            <p>
+              No YAML migration; additive reason/metadata changes must preserve
+              restoration and omit routing text.
+            </p>
+          </article>
+          <article class="card">
+            <h3>testing</h3>
+            <p>
+              Use pure projection tests, real SDK lifecycle/race/mode tests,
+              optional public-contract child tests, docs tests, and privacy
+              assertions.
+            </p>
+          </article>
+          <article class="card">
+            <h3>rollout-and-rollback</h3>
+            <p>
+              Use staged fail-closed rollout: primary routing remains governed
+              by enabled state, the child bridge is independently opt-in,
+              unsupported paths are untouched, and every failure preserves a
+              usable model.
+            </p>
+          </article>
+          <article class="card">
+            <h3>observability</h3>
+            <p>
+              Keep only model/role/reason/usage/status data, deduplicate
+              repeated decisions, provide remediation diagnostics, and never
+              emit projection text.
+            </p>
+          </article>
+          <article class="card">
+            <h3>performance-and-accessibility</h3>
+            <p>
+              Per-turn bounded requests are intentional and disclosed; avoid
+              modal UI during agent loops, keep status concise, and use no
+              routing-path discovery calls.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section>
+        <h2>Residual operating limits</h2>
+        <p class="muted">
+          These are intentional product boundaries after the required controls
+          pass, not accepted implementation risks.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Boundary</th>
+              <th>Guaranteed behavior</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Full textual context may be sensitive or costly</td>
+              <td>
+                Users receive accurate disclosure; protected system/context-file
+                and image data remain excluded; routing text is never logged or
+                persisted.
+              </td>
+            </tr>
+            <tr>
+              <td>Complete context may not fit the selector</td>
+              <td>
+                No partial context is classified. The selector is skipped and
+                the safe fallback model executes the turn.
+              </td>
+            </tr>
+            <tr>
+              <td>Some pi-subagents paths are unsupported</td>
+              <td>
+                Pinned, foreground, unbound, and external paths are
+                intentionally not intercepted; the bridge provides diagnostics
+                and the explicit selection API remains available.
+              </td>
+            </tr>
+            <tr>
+              <td>Optional host contracts may be unavailable</td>
+              <td>
+                The bridge stays disabled without affecting primary routing;
+                diagnostics identify the unsupported capability or version.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Assumptions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Assumption</th>
+              <th>Confidence</th>
+              <th>Impact if false</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                Pi continues to await `context` handlers before every provider
+                request with provider-ready non-system messages.
+              </td>
+              <td>high</td>
+              <td>
+                Per-turn pre-provider routing cannot be safely implemented at
+                extension level; scope must reduce to pre-agent routing.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Pi permits model/effort setting from a context handler before
+                dispatch.
+              </td>
+              <td>medium</td>
+              <td>
+                A supported host pre-provider model API would be required;
+                otherwise later turns cannot be rerouted.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Tested pi-subagents continues to expose documented runtime
+                registration, RPC/background native launch, and
+                extensionBindings contracts.
+              </td>
+              <td>medium</td>
+              <td>
+                Disable bridge with diagnostic while retaining primary Pi
+                routing.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Generated route-owned no-pin agent plus explicit binding is
+                sufficient proof for supported child authority.
+              </td>
+              <td>medium</td>
+              <td>
+                Narrow child support to explicit pre-launch selection only; do
+                not claim automatic child routing.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                Existing fallback ordering and configuration limits remain
+                public defaults.
+              </td>
+              <td>high</td>
+              <td>
+                A separate config version/migration decision would be required.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Open questions</h2>
+        <p class="muted">None.</p>
+      </section>
+      <section>
+        <h2>End-to-end validation</h2>
+        <ul>
+          <li>
+            Run every formatter, linter, type, test, documentation, and package
+            check declared in `package.json`.
+          </li>
+          <li>
+            Run targeted unit and real-SDK lifecycle/context/queue/pi-subagents
+            integration suites while iterating.
+          </li>
+          <li>
+            Use LSP and lens diagnostics on edited files before completion.
+          </li>
+          <li>
+            Manually run a TUI multi-turn tool task, manual pause, reload, and
+            supported/unsupported child scenarios from the updated checklist.
+          </li>
+        </ul>
+      </section>
+    </main>
+    <template id="pi-plan-markdown" data-format="markdown-v1"
+      ># Per-turn model routing across Pi prompt sources &gt; Generated
+      2026-09-07T04:35:14.711Z ·
+      sha256:8ab4e63149f73ff9d6d2ed918e77facafdd2aa77937d712a9ddbb91fafd5f101 ##
+      Summary Expand enabled model-role routing from idle TUI input to every
+      eligible primary Pi LLM request, using complete live textual message
+      context and a narrowly opt-in native pi-subagents background-child bridge.
+      ## Outcome Enabled routing makes a deterministic decision immediately
+      before each eligible LLM request; it excludes image bytes and
+      system/context-file material, never truncates oversized routing input,
+      preserves explicit choices, and falls back safely. ## Acceptance criteria
+      - Every configured primary Pi agent mode routes each eligible
+      provider-bound LLM turn, including expanded prompts, queued work, retries,
+      and tool-loop turns; non-LLM host/slash commands do not invoke selection.
+      - Selector input is a deterministic full textual projection of
+      provider-ready user, assistant/reasoning, tool-call, and tool-result text
+      with typed boundaries; it excludes image bytes, assembled system prompts,
+      AGENTS.md, skills, and context files. - Oversized full context is never
+      truncated or summarized: selection is skipped and configured-default →
+      baseline → current fallback leaves the LLM call executable. - Manual
+      model/effort changes, explicit selection API requests, explicit
+      pi-subagents per-run/agent pins, and stale/cancelled lifecycle work cannot
+      be overwritten by automatic routing. - Automatic child routing runs only
+      through a positively identified unpinned native pi-subagents
+      background-child bridge; foreground, unbound, pinned, and external paths
+      are untouched and get actionable guidance. - Tests and documentation cover
+      lifecycle sources, context privacy/limits, image eligibility,
+      races/fallbacks, supported child routing, and unsupported/pinned paths. ##
+      Scope ### In scope - Primary Pi lifecycle routing in TUI and non-TUI agent
+      modes with valid enabled configuration. - Text-only provider-ready message
+      projection, per-turn cancellation/application/persistence safety, and
+      existing model/image eligibility. - A public optional native pi-subagents
+      background-child bridge built solely on public contracts. - Tests, README,
+      guides, changelog, compatibility information, and manual checklist. ###
+      Out of scope - Pi, pi-subagents, provider, dependency, or node_modules
+      changes. - Universal interception of arbitrary pi-subagents launches,
+      foreground children, unbound native children, or external runners. - Image
+      bytes, assembled system prompts, AGENTS.md, skills, context files,
+      credentials, or raw routing context persistence. - Lossy truncation,
+      summarization, routing logs, or network discovery on the routing path. -
+      Role YAML schema migration or weakened explicit-model precedence. ##
+      Constraints - Implement only inside pi-model-roles. - Keep selection
+      deterministic, provider-agnostic, bounded, and backward-compatible for
+      public selection callers. - Routing failure must not prevent a usable LLM
+      call. - Use only documented pi-subagents contracts; do not parse private
+      configuration/source or infer undocumented pin provenance. - Continue
+      image-capability enforcement while omitting image data from classifier
+      requests. - Never serialize prompt/context text in decision metadata,
+      configuration, diagnostics, fixtures, or docs. ## Findings - **Current
+      routing is submission-only.** - `src/pi/controller.ts` `input()` accepts
+      only idle interactive non-slash TUI input and constructs a request from
+      `event.text`. - `src/extension.ts` delegates only its `input` lifecycle
+      hook to controller routing. - Pi extension docs specify `context` fires
+      before each LLM call with provider-ready messages. - **Core selection
+      already provides bounded safe fallback.** - `src/core/selection.ts`
+      handles timeout, cancellation, availability, selector-window checks, and
+      configured-default/baseline/current fallback. - `src/core/defaults.ts`
+      defines a 16,384-character task cap. - `src/pi/controller.ts` `apply()`
+      revalidates models and guards stale/manual model-switch races. - **The
+      requested data flow expands current task-only privacy semantics.** -
+      `src/core/classifier-protocol.ts` currently serializes only role
+      descriptions and `task`. - README and configuration documentation
+      currently promise submitted-task text rather than history. - Pi
+      `before_agent_start` exposes assembled system prompt/context-file details,
+      but the agreed boundary expressly excludes them. - **pi-subagents has
+      public opt-in seams but no universal safe child interception point.** -
+      Its docs expose runtime-agent registration, in-process RPC, structured
+      delegation, and extensionBindings as public seams. - Its documented
+      precedence places per-run and agent model overrides over inherited/default
+      models. - Its child-launch contract makes extension bindings available to
+      native background runners, not foreground children, and external runners
+      do not support them. - **Credential-free real lifecycle coverage exists.**
+      - `test/support/sdk.ts` creates a real Pi SDK AgentSession and faux
+      provider. - `test/integration/lifecycle.test.ts` covers reload, manual
+      mode, cancellation, and modes. - `test/integration/pi-subagents.test.ts`
+      uses the optional package&#39;s public event contract. ## Architecture
+      design A pure context projector feeds the existing pure selector. A
+      session-owned coordinator runs from Pi&#39;s pre-provider context event,
+      aborts obsolete work, safely applies the exact turn&#39;s model, and
+      stores only non-sensitive metadata. An optional bridge grants the same
+      behavior to one owned, unpinned native background child path. ```mermaid
+      flowchart TD A[Prompt, continuation, retry, or tool loop] --&gt; B[Pi
+      context event before provider request] B --&gt; C[RolesController turn
+      coordinator] C --&gt; D[Deterministic textual message projection] D --&gt;
+      E{Complete projection fits limits?} E -- yes --&gt; F[Bounded selector
+      request] E -- no --&gt; G[Safe default/baseline/current fallback] F --&gt;
+      H[Validate and apply exact turn model] G --&gt; I[Provider request] H
+      --&gt; I J[Manual change, reload, tree, shutdown] --&gt; K[Abort and
+      increment generation] K --&gt; C L[Owned native background pi-subagents
+      bridge] --&gt; M[Validated child binding] M --&gt; C N[Foreground, pinned,
+      unbound, external child] --&gt; O[No interception; diagnostic or explicit
+      API] ``` ## Implementation tasks ### T1 — Define a deterministic, private
+      full-context projection **What:** Add a pure routing-context layer that
+      converts the complete provider-ready message list into classifier text and
+      returns image/size metadata. **Why:** Per-turn routing needs complete live
+      textual context, while current selection accepts only submitted task text
+      and must not expose images or system-context material. **How:** Create a
+      core projector with stable role/block delimiters and field ordering.
+      Include textual user, assistant, reasoning, tool-call arguments, and
+      tool-result/error content; independently detect images for execution model
+      eligibility; omit binary/image payloads. Treat unknown non-text payloads
+      conservatively. Keep system prompt and `before_agent_start`
+      systemPromptOptions outside this interface. Measure the complete
+      projection before selection; add an explicit oversized-context reason and
+      use existing fallback instead of shortening, summarizing, or persisting
+      it. Keep `SelectionRequest.task` compatible for public callers.
+      **Files/modules:** src/core/routing-context.ts, src/core/types.ts,
+      src/core/defaults.ts, src/core/classifier-protocol.ts,
+      src/core/selection.ts, src/pi/session-state.ts,
+      test/unit/routing-context.test.ts, test/unit/selection.test.ts,
+      test/unit/privacy.test.ts **Depends on:** None **Validation:** - Unit
+      tests cover message/block ordering, multilingual text, reasoning, tool
+      calls, tool results/errors, text-plus-image, and malformed/unknown
+      payloads. - Projection tests prove no image bytes, assembled system
+      prompt, context-file contents, or credentials flow to classifier text. -
+      Exact-fit and one-unit-over character/byte/window tests prove no partial
+      projection is classified. - Decision/session data assertions prove no raw
+      routing text is retained. #### Subtasks ##### T1.1 — Specify canonical
+      text and image metadata **What:** Define the projector&#39;s supported
+      block mapping and image-presence result. **Why:** The classifier needs
+      unambiguous text boundaries and model selection still needs image
+      capability facts. **How:** Use explicit labels for message role and block
+      type, stable JSON-like field order where a block has multiple textual
+      fields, and a separate boolean/image metadata result without carrying
+      payload bytes. **Files/modules:** src/core/routing-context.ts,
+      test/unit/routing-context.test.ts **Depends on:** T1 **Validation:** -
+      Equal input messages produce byte-identical projection output. -
+      Image-only and mixed-content cases preserve image eligibility while
+      leaking no bytes. ##### T1.2 — Connect complete-input limits to selection
+      decisions **What:** Extend selection reason/type handling for a complete
+      context that cannot fit. **Why:** The agreed policy is full context or no
+      classification, not a lossy approximation. **How:** Add the minimal public
+      reason/docs contract and call the existing safe fallback chain before the
+      classifier if character or selector capacity checks fail; leave ordinary
+      selection API task behavior unchanged. **Files/modules:**
+      src/core/types.ts, src/core/defaults.ts, src/core/classifier-protocol.ts,
+      src/core/selection.ts, test/unit/selection.test.ts **Depends on:** T1.1
+      **Validation:** - Fallback model ordering matches existing configured
+      default, baseline, then current behavior. - Classifier mock is not called
+      for rejected complete projections. ### T2 — Route from Pi&#39;s
+      pre-provider lifecycle on every primary turn **What:** Refactor controller
+      state from interactive input submission routing into a session-scoped
+      context-turn coordinator and register it with Pi lifecycle events.
+      **Why:** Pi&#39;s `input` hook misses skill/template expansion and all
+      later turns; `context` is the documented hook immediately before every LLM
+      provider call. **How:** Add `turn_start`/`context` lifecycle wiring in
+      `src/extension.ts`. Refactor `RolesController` to build a full-context
+      request, select once, and apply only a live session/generation token.
+      Decouple activation from TUI for primary agent modes while keeping
+      missing/default-only configuration non-invasive. Replace active-agent
+      modal loader use with status-safe behavior. Retain input processing only
+      for Auto Setup/ordinary input. Ensure every request carries actual current
+      state, baseline, manual/disabled status, and image requirement. Preserve
+      `setPair` expected-change handling and make session state/decision
+      recording non-sensitive and deduplicated. **Files/modules:**
+      src/pi/controller.ts, src/pi/session-state.ts, src/pi/adapters.ts,
+      src/extension.ts, src/ui/selection-loader.ts,
+      test/integration/lifecycle.test.ts,
+      test/integration/context-and-queue.test.ts, test/support/sdk.ts **Depends
+      on:** T1.2 **Validation:** - Real SDK tests assert selector then
+      execution-model ordering for initial expanded work and later tool-loop
+      turns. - Configured TUI, print, JSON, and RPC primary sessions route
+      actual LLM calls; absent/default-only config stays non-disruptive. -
+      Queued continuation, retry, programmatic prompt, and tool-loop cases route
+      only when a provider request occurs. - Slash/extension commands without an
+      LLM call make no selector request. #### Subtasks ##### T2.1 — Coordinate
+      turns, cancellation, and stale application **What:** Create per-turn abort
+      ownership separate from old interactive pending state. **Why:** Selection
+      and model application await points otherwise permit stale work after
+      manual choices or lifecycle transitions. **How:** Track current session
+      ID, generation, and turn abort controller; cancel on reload, tree,
+      shutdown, manual model/effort change, and relevant replacement. Recheck
+      authority before/after selection and apply; preserve finite fallback and
+      do not open UI prompts while an agent is active. **Files/modules:**
+      src/pi/controller.ts, src/extension.ts,
+      test/integration/lifecycle.test.ts,
+      test/integration/context-and-queue.test.ts **Depends on:** T1.2
+      **Validation:** - Delayed selection/application race tests cover manual
+      change, reload, tree, shutdown, and cancellation without leaving stale
+      model/effort selected. - Timeout, selector error, and cancellation still
+      allow the provider call with safe fallback/current state. ##### T2.2 —
+      Persist only useful non-sensitive per-turn state **What:** Adapt status,
+      restore markers, and decision entries for repeated routing. **Why:** Tool
+      loops may repeat a role decision; session restore needs state without
+      creating a context log or duplicate churn. **How:** Compare effective
+      model/effort and deduplicate unchanged decision/state entries. Persist
+      only existing model, effort, role, reason, warnings, and selector usage
+      metadata. Preserve manual pause and explicit `/model-roles use`
+      precedence. **Files/modules:** src/pi/controller.ts,
+      src/pi/session-state.ts, test/integration/lifecycle.test.ts,
+      test/unit/privacy.test.ts **Depends on:** T2.1 **Validation:** -
+      Multi-turn tests show no projected text in custom entries and no duplicate
+      unchanged records. - Reload/tree tests retain current mode, baseline, and
+      safe role semantics. ### T3 — Implement an opt-in native pi-subagents
+      background-child bridge **What:** Create a public optional bridge and
+      child entry that enable automatic per-turn routing only for an owned,
+      unpinned native background child. **Why:** Explicit per-run and agent pins
+      must win, and pi-subagents exposes no safe universal interception hook for
+      arbitrary child launches. **How:** Use only documented public
+      runtime-agent registration/RPC/extension-binding contracts, without a
+      production runtime dependency on pi-subagents. Parent bridge
+      capability-checks the owner, creates a generated per-session route-owned
+      native agent with no model/effort pin, launches only the supported
+      background path with a versioned `pi-model-roles/1` authority binding, and
+      explicitly loads the child entry. The child validates binding before
+      enabling print-mode controller routing. Reject or diagnose unavailable
+      owner, bad protocol/binding, model/effort pin, foreground mode, external
+      runner, and unowned paths; direct callers retain `selectViaEvents` as the
+      explicit alternative. **Files/modules:** src/integrations/pi-subagents.ts,
+      src/integrations/pi-subagents-child.ts, src/index.ts, src/extension.ts,
+      examples/pi-subagents.ts, package.json,
+      test/integration/pi-subagents.test.ts, test/support/sdk.ts **Depends on:**
+      T2.2 **Validation:** - Optional-package integration launches a valid owned
+      native background child and observes per-turn child selection before
+      execution. - Explicit per-run and agent-pinned routes remain
+      preserved/rejected rather than rerouted. - Foreground, unbound native, and
+      external/unsupported paths never activate child routing and return
+      actionable diagnostics. - Bridge import/use works with pi-subagents
+      absent. #### Subtasks ##### T3.1 — Define parent bridge authority and
+      diagnostics **What:** Implement versioned binding/capability validation
+      and a public result contract. **Why:** Positive route authority must be
+      explicit and auditable rather than guessed from child environment or model
+      state. **How:** Require generated owned-agent identity, exact binding
+      namespace/version, native-background capability, and no supplied
+      model/effort; return bounded non-sensitive reason/remediation values for
+      unsupported states. **Files/modules:** src/integrations/pi-subagents.ts,
+      src/core/types.ts, src/index.ts, test/integration/pi-subagents.test.ts
+      **Depends on:** T2.2 **Validation:** - Fixtures cover no owner, malformed
+      response, bad capabilities/binding, pin input, and successful authority. -
+      Type/package checks prove no optional dependency becomes required at
+      runtime. ##### T3.2 — Gate child activation on validated route authority
+      **What:** Implement a separate child extension entry that uses shared turn
+      routing only when the bridge binding is valid. **Why:**
+      `PI_SUBAGENT_CHILD` or ambient extension loading alone cannot prove a
+      child is unpinned. **How:** Strictly parse the bound JSON, initialize
+      cleanup-scoped child controller state only for supported background print
+      hosts, and leave foreground and unbound hosts inactive. **Files/modules:**
+      src/integrations/pi-subagents-child.ts, src/pi/controller.ts,
+      src/extension.ts, test/integration/pi-subagents.test.ts **Depends on:**
+      T3.1 **Validation:** - No-binding child case makes zero selection
+      requests; valid binding routes each child LLM turn. - Child
+      cancellation/shutdown releases local state and cannot affect parent
+      controller state. ### T4 — Align documentation, examples, and
+      compatibility claims **What:** Update user and maintainer docs for
+      per-turn cost/data flow, full-context limits, and narrow pi-subagents
+      support. **Why:** Existing docs promise task-only data and one selector
+      request before a new prompt, which becomes inaccurate. **How:** Revise
+      README, configuration limit/privacy/recovery sections, architecture flow,
+      API docs, compatibility matrix, changelog, example, and manual checklist.
+      Explain that every LLM turn may add a selector request; full textual
+      user/assistant/reasoning/tool content can be sent to the configured
+      selector; system/context files and image bytes are excluded; oversize
+      input falls back without truncation; and bridge-only child routing
+      preserves pins. Document explicit selection API remediation for excluded
+      paths. **Files/modules:** README.md, docs/configuration.md,
+      docs/architecture.md, docs/api.md, docs/compatibility.md, CHANGELOG.md,
+      examples/pi-subagents.ts, test/manual/tui-checklist.md **Depends on:**
+      T3.2 **Validation:** - Documentation/package tests and link checks pass. -
+      No documentation still claims task-only or one-per-new-prompt automatic
+      selection. - Supported bridge example and every unsupported-path
+      remediation match the implemented public contract. #### Subtasks #####
+      T4.1 — Document lifecycle, privacy, cost, and fallback behavior **What:**
+      Replace submission-time routing language with exact per-provider-turn
+      behavior. **Why:** Users need informed consent and predictable behavior in
+      long/tool-heavy sessions. **How:** State inclusion/exclusion lists, no
+      persistence/logging guarantee, image enforcement, no-truncation policy,
+      safe fallback ordering, and selector cost implications. **Files/modules:**
+      README.md, docs/configuration.md, docs/architecture.md, CHANGELOG.md
+      **Depends on:** T2.2 **Validation:** - Review confirms all limits/privacy
+      examples match implementation and contain no sensitive content. ##### T4.2
+      — Document child bridge limits and alternatives **What:** Publish setup,
+      capability requirements, diagnostics, pin precedence, and explicit API
+      alternative. **Why:** The bridge must not be mistaken for universal
+      subagent interception. **How:** Add API example and compatibility table
+      for owned native background, pinned, foreground, unbound, and external
+      paths; link `selectViaEvents` for controlled pre-launch selection.
+      **Files/modules:** docs/api.md, docs/compatibility.md, README.md,
+      examples/pi-subagents.ts, test/manual/tui-checklist.md **Depends on:**
+      T3.2 **Validation:** - Each excluded path has a concrete safe next action
+      and is not claimed as automatically routed. ### T5 — Execute quality gates
+      and regression matrix **What:** Run the repository formatter, type
+      checker, linter, tests, documentation checks, and diagnostics after
+      implementation. **Why:** The change crosses public types, Pi lifecycle
+      behavior, optional integrations, and privacy guarantees. **How:** Extend
+      faux-provider fixtures only as needed for expanded
+      prompt/multiple-turn/child-binding behavior. Run targeted tests during
+      work, then scripts in `package.json`; run LSP/lens diagnostics and inspect
+      final diff for leaked context in tests/docs. **Files/modules:**
+      package.json, test/support/sdk.ts, test/support/fixtures.ts,
+      test/unit/routing-context.test.ts, test/integration/lifecycle.test.ts,
+      test/integration/context-and-queue.test.ts,
+      test/integration/pi-subagents.test.ts, test/unit/documentation.test.ts
+      **Depends on:** T4.2 **Validation:** - All documented package scripts for
+      formatting, lint, types, tests, and docs/package assertions pass. -
+      Targeted lifecycle and optional pi-subagents tests pass without live
+      credentials. - LSP/lens diagnostics show no blocking errors in edited
+      files. - Final privacy review finds no raw prompt/context in output,
+      fixtures, session expectations, diagnostics, or docs. #### Subtasks #####
+      T5.1 — Expand deterministic real-SDK lifecycle fixtures **What:** Assert
+      selector/execution ordering over repeated provider calls without
+      network/timing dependence. **Why:** Coverage must prove source and turn
+      completeness, not infer it from a single interactive prompt. **How:** Add
+      explicit faux response sequences/event observations for expansion, tool
+      loops, queued execution, errors/retries, and multiple modes.
+      **Files/modules:** test/support/sdk.ts,
+      test/integration/lifecycle.test.ts,
+      test/integration/context-and-queue.test.ts **Depends on:** T2.2
+      **Validation:** - Tests assert selector and execution count/model for
+      every eligible turn. - Race tests remain repeatable. ##### T5.2 — Verify
+      bridge and no-leak matrix **What:** Exercise optional public contracts and
+      privacy boundaries together. **Why:** The bridge is
+      compatibility-sensitive and full-text routing raises privacy regression
+      risk. **How:** Use public pi-subagents events/RPC only; add
+      pin/unsupported/no-binding assertions and scan classifier/decision/session
+      test data for raw text. **Files/modules:**
+      test/integration/pi-subagents.test.ts, test/unit/privacy.test.ts,
+      test/unit/documentation.test.ts **Depends on:** T3.2, T4.2 **Validation:**
+      - Dependency absence yields documented graceful behavior. - Pin,
+      unsupported, invalid-binding, and no-log assertions pass. ## Engineering
+      considerations ### architecture Keep projection pure and
+      provider-agnostic; isolate lifecycle and child integration from core
+      selection policy. ### security Treat message text as sensitive; exclude
+      system/context/image data, validate bindings, avoid logs/persistence, and
+      fail closed on unknown authority. ### data-and-migrations No YAML
+      migration; additive reason/metadata changes must preserve restoration and
+      omit routing text. ### testing Use pure projection tests, real SDK
+      lifecycle/race/mode tests, optional public-contract child tests, docs
+      tests, and privacy assertions. ### rollout-and-rollback Use staged
+      fail-closed rollout: primary routing remains governed by enabled state,
+      the child bridge is independently opt-in, unsupported paths are untouched,
+      and every failure preserves a usable model. ### observability Keep only
+      model/role/reason/usage/status data, deduplicate repeated decisions,
+      provide remediation diagnostics, and never emit projection text. ###
+      performance-and-accessibility Per-turn bounded requests are intentional
+      and disclosed; avoid modal UI during agent loops, keep status concise, and
+      use no routing-path discovery calls. ## Required risk controls
+      **Completion gate: no unmitigated high-severity implementation risk.** The
+      implementation is not complete unless every required control is
+      implemented and verified. The design fails closed: unsafe, stale,
+      oversized, unsupported, or unverifiable routing leaves Pi on its safe
+      configured-default → baseline → current model path. - **Private, bounded
+      data flow:** project only provider-ready text; exclude image bytes, system
+      prompts, AGENTS.md, skills, and context files; never persist or log
+      projections; skip classification rather than truncate. Prove this with
+      projection, privacy, boundary, and session-entry tests. - **Stale-switch
+      prevention:** use session/generation authority, per-turn abort
+      controllers, expected-change guards, and pre-apply revalidation. Prove
+      this with delayed manual-change, reload, tree, shutdown, cancellation, and
+      replacement-turn tests. - **Verified child authority:** enable only an
+      explicitly bound, generated route-owned native background child with no
+      model/effort pin. Prove pinned, foreground, unbound, and external paths
+      remain untouched and give remediation. - **Predictable overload
+      behavior:** make at most one bounded selector attempt per turn,
+      deduplicate metadata, avoid active-agent modal UI, and fall back safely on
+      timeout or capacity exhaustion. - **Version-safe bridge and rollback:**
+      require documented capability/version validation, keep primary routing
+      independent of bridge availability, retain enabled/disabled routing
+      control, and never block a provider request for routing failure. ##
+      Residual operating limits These are intentional product boundaries after
+      the required controls pass, not accepted implementation risks. - **Full
+      textual context may be sensitive or costly:** accurate disclosure applies;
+      protected system/context-file and image data remain excluded; routing text
+      is never logged or persisted. - **Complete context may not fit the
+      selector:** no partial context is classified; the selector is skipped and
+      the safe fallback model executes the turn. - **Some pi-subagents paths are
+      unsupported:** pinned, foreground, unbound, and external paths are
+      intentionally not intercepted; the bridge gives diagnostics and the
+      explicit selection API remains available. - **Optional host contracts may
+      be unavailable:** the bridge stays disabled without affecting primary
+      routing; diagnostics identify the unsupported capability or version. ##
+      Assumptions - Pi continues to await `context` handlers before every
+      provider request with provider-ready non-system messages. - If false:
+      Per-turn pre-provider routing cannot be safely implemented at extension
+      level; scope must reduce to pre-agent routing. - Pi permits model/effort
+      setting from a context handler before dispatch. - If false: A supported
+      host pre-provider model API would be required; otherwise later turns
+      cannot be rerouted. - Tested pi-subagents continues to expose documented
+      runtime registration, RPC/background native launch, and extensionBindings
+      contracts. - If false: Disable bridge with diagnostic while retaining
+      primary Pi routing. - Generated route-owned no-pin agent plus explicit
+      binding is sufficient proof for supported child authority. - If false:
+      Narrow child support to explicit pre-launch selection only; do not claim
+      automatic child routing. - Existing fallback ordering and configuration
+      limits remain public defaults. - If false: A separate config
+      version/migration decision would be required. ## Open questions ##
+      End-to-end validation - Run every formatter, linter, type, test,
+      documentation, and package check declared in `package.json`. - Run
+      targeted unit and real-SDK lifecycle/context/queue/pi-subagents
+      integration suites while iterating. - Use LSP and lens diagnostics on
+      edited files before completion. - Manually run a TUI multi-turn tool task,
+      manual pause, reload, and supported/unsupported child scenarios from the
+      updated checklist.
+    </template>
+    <footer>
+      <div class="shell">
+        Generated by Pi Planning HTML. Run
+        <code>/execute-plan &lt;this-file&gt;</code> to extract its Markdown and
+        begin implementation.
+      </div>
+    </footer>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs";
+
+      try {
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          flowchart: { htmlLabels: false },
+          secure: ["securityLevel", "startOnLoad", "maxTextSize"],
+        });
+        await mermaid.run({ querySelector: "#architecture-diagram" });
+      } catch {
+        // Leave the escaped Mermaid source visible when rendering is unavailable.
+      }
+    </script>
+  </body>
+</html>

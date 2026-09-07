@@ -7,6 +7,7 @@ import { fauxAssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import example, { delegateExample } from "../../examples/pi-subagents.js";
 import { ConfigStore } from "../../src/config/store.js";
+import { createPiSubagentsBackgroundBridge } from "../../src/integrations/pi-subagents.js";
 import { config, FAST } from "../support/fixtures.js";
 import { sdkHarness } from "../support/sdk.js";
 test("pi-subagents 0.65.1: native public delegation receives selected model and explicit effort", {
@@ -43,6 +44,16 @@ test("pi-subagents 0.65.1: native public delegation receives selected model and 
   });
   try {
     assert.ok(pi);
+    const bridgeEvents: string[] = [];
+    const unsubscribe = [
+      pi.events.on("subagents:rpc:v1:request", () => bridgeEvents.push("rpc")),
+      pi.events.on("pi-subagents:runtime-agent-register:v1", () => bridgeEvents.push("register")),
+    ];
+    const bridge = await createPiSubagentsBackgroundBridge(pi);
+    unsubscribe.forEach((off) => off());
+    assert.equal(bridge.status, "unsupported");
+    assert.equal("spawn" in bridge, false);
+    assert.deepEqual(bridgeEvents, []);
     let launchError = "";
     h.bus.on("prompt-template:subagent:response", (value: unknown) => {
       if (value && typeof value === "object" && "error" in value) launchError = String(value.error);

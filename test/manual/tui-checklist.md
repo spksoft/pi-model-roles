@@ -12,7 +12,7 @@
 4. Use synthetic task text, role descriptions, and image attachments. Configure a fake provider for offline routing checks. If no test provider is available, mark provider-dependent checks **not run**, not passed. Use live accounts only with separate approval.
 5. Prepare terminal widths of 40, 80, and 120 columns and light/dark themes. Include multiline non-English input and an input method editor (IME).
 
-The separate [GitHub installation flow](../../README.md#install-from-github) must expose `/model-roles` after install or update without a manual build. Test that flow in a disposable agent directory when validating installation changes; do not claim a live GitHub install was checked merely because local extension loading worked.
+The separate [GitHub installation flow](../../README.md#quick-install) must expose `/model-roles` after install or update without a manual build. Test that flow in a disposable agent directory when validating installation changes; do not claim a live GitHub install was checked merely because local extension loading worked.
 
 ## First use and role management
 
@@ -45,7 +45,10 @@ The separate [GitHub installation flow](../../README.md#install-from-github) mus
 
 ## Selection and user control
 
-- [ ] Submit an idle task with eligible custom roles. The selector runs once on default and execution uses the selected role. Tools and queued follow-ups retain that model.
+- [ ] Submit two idle tasks selecting different pairs. Verify the actual fake-provider model/effort on each request, not only the footer. The selector runs once per eligible submission; tool loops and queued follow-ups are not independently rerouted.
+- [ ] Read first-role consent: it must say task text and role descriptions, no automatic history collection, no tool-loop rerouting, and warn that pasted task text is not secret-filtered. Verify synthetic skill expansion and file-tool history never appear in a later selector request.
+- [ ] Run Auto Setup research and Discuss/refine with existing custom roles and then an overridden default. Both retain the original actual model/effort and proposal authority.
+- [ ] Try the automatic-child compatibility probe with pi-subagents absent and enabled. Both return unsupported without registering or launching anything. A stale dedicated child entry with an apparent binding also stays inert; explicit pre-launch selection continues to preserve caller pins and launcher restrictions.
 - [ ] Check no-match and overlapping descriptions. Default fallback is visible rather than silently choosing the first custom role.
 - [ ] Press Escape during the selector loader. Execution is cancelled and task text is restored. Verify the image reattachment warning with a synthetic attachment.
 - [ ] Change model/effort manually. The footer shows `auto-selector=disabled`; `/model-roles enable` resumes on the next eligible prompt without sending a request immediately. Reload preserves manual authority.

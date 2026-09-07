@@ -39,6 +39,8 @@ Run these inside Pi:
 
 Manual model or reasoning-effort changes also pause automatic selection. Your Pi defaults are never rewritten.
 
+**Routing scope:** selection runs before a new idle TUI submission, not on each tool-loop turn or in headless/child sessions. Per-turn switching and the automatic pi-subagents background bridge are unsupported on the tested versions. See [why and the supported alternatives](docs/compatibility.md#per-turn-routing-is-not-supported).
+
 ## Manual role setup
 
 You can also add roles yourself in `/model-roles settings`. Add a custom role only for a clearly different task type, then choose its model and a supported reasoning effort. A useful description says when the role applies, for example:
@@ -67,7 +69,7 @@ Use Settings instead of editing YAML unless you need the detailed options in the
 
 ## Cost and privacy
 
-Custom roles add one selector request before eligible tasks. The selector receives your submitted task text and role descriptions; the selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See the detailed [cost and privacy guidance](docs/configuration.md#auto-setup).
+Custom roles can add one selector request before an eligible idle TUI submission. The selector receives submitted task text and role descriptions—not automatically collected history, tool results, image bytes, or loaded system/skill/context files. Text you paste into the task is still included; this is not a secret detector. The selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See [cost and privacy safeguards](docs/configuration.md#advanced-limits-and-safeguards).
 
 ## Detailed guides
 

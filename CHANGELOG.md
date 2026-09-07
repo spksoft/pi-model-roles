@@ -4,6 +4,13 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ## 0.1.0 — Unreleased
 
+### Routing safety review
+
+- Withdraw the per-turn/full-history routing experiment: Pi 0.85.1 captures the dispatch model/effort before `context`, so switching there routed the actual call on the previous pair. Restore supported pre-submission idle-TUI routing and document excluded prompt sources.
+- Withdraw automatic pi-subagents background launching. `createPiSubagentsBackgroundBridge` and `piSubagentRoutingDiagnostic` report `automatic_child_routing_unsupported` without registration, RPC, timers, or launch. The old child entry is inert; explicit pre-launch selection remains available with caller pins/scopes and launcher authority preserved.
+- Keep skill/tool/history text out of automatic selector data, preserve Auto Setup research/refinement model and effort, and align live consent with task-only routing. Pasted task content is not secret-filtered.
+- Surface swallowed faux-provider callback assertions, assert actual dispatch pairs outside provider callbacks, and restore compaction/queue/application-race regressions. Add synthetic skill/file privacy, empty/image-only input, and fail-closed bridge coverage. No live-provider or visual TUI acceptance is claimed.
+
 ### Auto Setup
 
 - Add an optional primary-TUI Auto Setup flow: select up to eight cached available models, ask the current Pi model to research them with its configured tools when available, then review/discuss/cancel a bounded proposal before any role save.
