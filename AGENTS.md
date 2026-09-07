@@ -13,6 +13,13 @@
 - Never include secrets, prompts containing sensitive user data, or credentials in routing logs, errors, fixtures, or documentation.
 - Make defaults conservative: a routing failure must not prevent Pi Agent from completing work when a usable fallback exists.
 
+## Repository boundary
+
+- This repository is self-contained: implement changes only in `pi-model-roles`.
+- Do not modify, fork, vendor, patch, publish, or require unreleased changes to other packages, including `pi-subagents`, Pi Agent, providers, or external runners.
+- If a requested behavior requires an upstream package change, reduce the implementation scope, document the compatibility limitation, and provide a safe diagnostic rather than editing dependencies or claiming unsupported coverage.
+- Do not use temporary `node_modules` edits as an implementation or test solution.
+
 ## Implementation guidance
 
 - Define role/policy data declaratively where possible, rather than scattering model names and thresholds through control flow.
