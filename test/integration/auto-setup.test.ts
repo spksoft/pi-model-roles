@@ -85,6 +85,11 @@ async function submitResearch(
 test("confirmed Auto Setup save preserves the active model and writes only the reviewed role diff", async () => {
   const h = await sdkHarness();
   try {
+    const store = new ConfigStore(h.dir);
+    const before = await store.load();
+    assert.ok(before);
+    await store.save({ ...before.config, selectorContext: "conversation" }, before.revision);
+    await h.session.reload();
     await submitResearch(h, ["Confirm settings", true, true]);
     await waitFor(
       () => h.ui.notifications.some((message) => message.includes("Model roles saved.")),
@@ -96,6 +101,8 @@ test("confirmed Auto Setup save preserves the active model and writes only the r
     assert.ok(quick && quick.model !== "inherit");
     assert.equal(quick.model.id, "owner/fast");
     assert.equal(quick.effort, "low");
+    assert.equal(snapshot.config.selectorContext, "conversation");
+    assert.equal(snapshot.config.enabled, before.config.enabled);
     const confirmation = h.ui.confirmations.find(
       (item) => item.title === "Save Auto Setup role changes?",
     );
@@ -110,7 +117,7 @@ test("confirmed Auto Setup save preserves the active model and writes only the r
     );
     assert.match(
       disclosure?.message ?? "",
-      /current role descriptions, assignments, enabled state, and selector timeout/,
+      /current role descriptions, assignments, enabled state, selector timeout, and selector context policy/,
     );
     const report = h.ui.notifications.find((message) => message.startsWith("Auto Setup report"));
     assert.ok(report?.includes(offlineProposal().roles[0]!.effortRationale));

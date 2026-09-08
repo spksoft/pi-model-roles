@@ -20,6 +20,8 @@ export function modelRoleCommandCompletions(
       : { value: "enable", label: "Enable Auto Selector" },
     ...roleIds.map((id) => ({ value: `use ${id}`, label: `Use ${id}` })),
     { value: "run", label: "Run command with model routing" },
+    { value: "context", label: "Choose selector context (with consent)" },
+    { value: "why", label: "Explain the last selection" },
   ].filter((item) => item.value.startsWith(prefix));
 }
 
@@ -101,6 +103,7 @@ export default function modelRoles(pi: ExtensionAPI): void {
       });
     }, 0);
   });
+  pi.on("session_compact", () => controller.invalidate());
   pi.on("session_tree", (_event, ctx) => {
     controller.tree(ctx);
     autoSetup.tree(ctx);

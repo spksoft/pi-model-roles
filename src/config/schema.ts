@@ -38,7 +38,13 @@ function role(value: unknown, isDefault: boolean, field: string): DefaultRole | 
 }
 export function validateConfig(value: unknown): RoleConfig {
   if (!isRecord(value)) throw new ConfigError("expected_object");
-  keys(value, ["version", "enabled", "selectorTimeoutMs", "roles"], "config");
+  keys(value, ["version", "enabled", "selectorTimeoutMs", "selectorContext", "roles"], "config");
+  if (
+    value.selectorContext !== undefined &&
+    value.selectorContext !== "prompt" &&
+    value.selectorContext !== "conversation"
+  )
+    throw new ConfigError("invalid_selector_context", "selectorContext");
   if (value.version !== 1) throw new ConfigError("unsupported_version", "version");
   if (value.enabled !== undefined && typeof value.enabled !== "boolean")
     throw new ConfigError("invalid_boolean", "enabled");
@@ -60,7 +66,15 @@ export function validateConfig(value: unknown): RoleConfig {
       throw new ConfigError("invalid_role_id", "roles");
     if (id !== "default") roles[id] = role(value.roles[id], false, `roles.${id}`);
   }
-  return { version: 1, enabled: value.enabled ?? true, selectorTimeoutMs: timeout, roles };
+  return {
+    version: 1,
+    enabled: value.enabled ?? true,
+    selectorTimeoutMs: timeout,
+    roles,
+    ...(value.selectorContext === undefined
+      ? {}
+      : { selectorContext: value.selectorContext as RoleConfig["selectorContext"] }),
+  };
 }
 export function freezeConfig(config: RoleConfig): RoleConfig {
   for (const value of Object.values(config.roles)) {

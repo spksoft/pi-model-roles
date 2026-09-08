@@ -1,6 +1,13 @@
 import { validateConfig } from "../config/schema.js";
 import { bounded, DeadlineError } from "./async.js";
-import { CLASSIFIER_PROMPT, classifierText, parseMatches } from "./classifier-protocol.js";
+import {
+  CLASSIFIER_PROMPT,
+  CONTEXT_CLASSIFIER_PROMPT,
+  classifierText,
+  parseContextMatch,
+  parseMatches,
+} from "./classifier-protocol.js";
+import { routingMetadata, validRoutingContext } from "./routing-context.js";
 import { LIMITS, RESERVED_IDS, ROLE_ID, charLength } from "./defaults.js";
 import { isEffort, isModelRef, isRecord, modelKey, sameModel } from "./model-identity.js";
 import {
@@ -10,6 +17,7 @@ import {
   type ModelRef,
   type ModelState,
   type Reason,
+  type RoutingContext,
   type SelectionDecision,
   type SelectionDependencies,
   type SelectionRequest,
@@ -189,9 +197,25 @@ function preserved(
     ? { ...result, status: "preserved" }
     : unavailable("invalid_explicit");
 }
+function continuationDecision(
+  request: SelectionRequest,
+  deps: SelectionDependencies,
+  context?: RoutingContext,
+): SelectionDecision | undefined {
+  if (!context?.messages.length || !context.previousRole) return undefined;
+  const state = roleState(context.previousRole, request, deps);
+  const decision = state && selected(request, deps, state, "continued", context.previousRole);
+  return decision?.status === "selected" &&
+    sameModel(decision.model, request.current.model) &&
+    decision.effort === request.current.effort
+    ? decision
+    : undefined;
+}
+
 async function autoSelect(
   request: SelectionRequest,
   deps: SelectionDependencies,
+  context?: RoutingContext,
 ): Promise<SelectionDecision> {
   const ids = Object.keys(deps.config.roles).filter((id) => id !== "default");
   const candidates = ids.filter((id) =>
@@ -199,6 +223,7 @@ async function autoSelect(
   );
   const finish = (result: SelectionDecision): SelectionDecision => {
     if (candidates.length < ids.length) result.warnings.push("roles_unavailable");
+    if (context) result.routing = routingMetadata(context);
     return result;
   };
   if (!candidates.length) return finish(fallbackDecision(request, deps, "default_only", false));
@@ -212,13 +237,19 @@ async function autoSelect(
     roleState("default", request, deps)?.model,
   );
   if (!selector) return finish(fallbackDecision(request, deps, "selector_unavailable"));
-  const text = classifierText(request.task, deps.config.roles, candidates);
-  // UTF-8 bytes are a conservative upper token estimate, including multilingual input.
-  if (
-    Buffer.byteLength(text + CLASSIFIER_PROMPT) + LIMITS.outputTokens + 1024 >
-    selector.contextWindow
-  )
-    return finish(fallbackDecision(request, deps, "context_budget"));
+  if (context && !continuationDecision(request, deps, context)) delete context.previousRole;
+  const systemPrompt = context ? CONTEXT_CLASSIFIER_PROMPT : CLASSIFIER_PROMPT;
+  let text = classifierText(request.task, deps.config.roles, candidates, context);
+  // Remove oldest optional history to fit. Never shorten the task or role descriptions.
+  const fits = () =>
+    Buffer.byteLength(text + systemPrompt) + LIMITS.outputTokens + 1024 <= selector.contextWindow;
+  while (!fits() && context?.messages.length) {
+    context.messages.shift();
+    context.truncated = true;
+    if (!context.messages.length) delete context.previousRole;
+    text = classifierText(request.task, deps.config.roles, candidates, context);
+  }
+  if (!fits()) return finish(fallbackDecision(request, deps, "context_budget"));
   const start = (deps.now ?? Date.now)();
   let metadata: SelectorMetadata = { model: { ...selector.ref }, durationMs: 0 };
   let result: SelectionDecision;
@@ -227,7 +258,7 @@ async function autoSelect(
       (signal) =>
         deps.classify({
           model: selector.ref,
-          systemPrompt: CLASSIFIER_PROMPT,
+          systemPrompt,
           text,
           signal,
           maxTokens: LIMITS.outputTokens,
@@ -235,7 +266,8 @@ async function autoSelect(
       deps.config.selectorTimeoutMs,
       request.signal,
     );
-    const matches = parseMatches(response.text, candidates);
+    const contextualMatch = context ? parseContextMatch(response.text, candidates) : undefined;
+    const matches = context ? contextualMatch?.matches : parseMatches(response.text, candidates);
     if (
       response.usage &&
       [
@@ -254,7 +286,11 @@ async function autoSelect(
           cost: response.usage.cost,
         },
       };
-    if (matches?.length === 1) {
+    if (contextualMatch?.action === "continue") {
+      result =
+        continuationDecision(request, deps, context) ??
+        fallbackDecision(request, deps, "invalid_response");
+    } else if (matches?.length === 1) {
       const id = matches[0] as string;
       const state = roleState(id, request, deps);
       result =
@@ -283,9 +319,27 @@ async function autoSelect(
   return finish(result);
 }
 /** Selects only: no filesystem writes, active-model mutation, agent execution, or credential discovery. */
-export async function selectModelForTask(
+export function selectModelForTask(
   request: SelectionRequest,
   dependencies: SelectionDependencies,
+): Promise<SelectionDecision> {
+  return select(request, dependencies);
+}
+
+/** Opt-in direct API. The caller owns consent/projection; no implicit session history access. */
+export function selectModelWithContext(
+  request: SelectionRequest,
+  dependencies: SelectionDependencies,
+  context: RoutingContext,
+): Promise<SelectionDecision> {
+  if (!validRoutingContext(context)) return Promise.resolve(unavailable("invalid_request"));
+  return select(request, dependencies, structuredClone(context));
+}
+
+async function select(
+  request: SelectionRequest,
+  dependencies: SelectionDependencies,
+  context?: RoutingContext,
 ): Promise<SelectionDecision> {
   if (!validRequest(request)) return unavailable("invalid_request");
   if (request.signal?.aborted) return unavailable("cancelled", true);
@@ -307,7 +361,7 @@ export async function selectModelForTask(
       );
     }
     if (!deps.config.enabled) return preserved(request, deps, "disabled");
-    return await autoSelect(request, deps);
+    return await autoSelect(request, deps, context);
   } catch {
     return unavailable("no_usable_model");
   }

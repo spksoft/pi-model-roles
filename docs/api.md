@@ -96,6 +96,30 @@ The classifier must return strict JSON such as `{"matches":["quick"]}`. See [pro
 
 Your adapter owns authentication, availability, scope, and trusted finite capability values. The API grants no permissions. Requests are independent; do not concurrently mutate caller-owned objects or adapters while a request is outstanding.
 
+## Explicit contextual selection
+
+`selectModelWithContext(request, dependencies, context)` is a separate opt-in direct API. The existing `selectModelForTask` and `pi-model-roles:select:v1` contracts remain prompt-only even when configuration contains `selectorContext: conversation`; unknown request keys (including `context`) remain invalid. The direct contextual call is explicit consent by its caller and does not read a Pi session or depend on the configured TUI context mode.
+
+```ts
+import { selectModelWithContext } from "pi-model-roles";
+
+const decision = await selectModelWithContext(request, dependencies, {
+  version: 1,
+  messages: [
+    { kind: "user", text: "Rename this label without changing behavior." },
+    { kind: "assistant", text: "One occurrence remains." },
+  ],
+  truncated: false,
+  previousRole: "quick", // optional, only if this was the current assignment
+});
+```
+
+The integration owns consent, privacy, projection, and final application checks. Context is strict: `version: 1`, chronological `messages` with exactly `kind: "user" | "assistant" | "summary"` and nonblank `text: string`, required `truncated: boolean`, optional valid `previousRole: string`, and no unknown fields. At most 12 messages, 4 KiB UTF-8 per message, 16 KiB text total; invalid context returns `invalid_request` rather than being silently accepted. Inputs are copied, not mutated. Do not pass raw reasoning, tool output, images, credentials, or full transcripts; see [privacy limits](configuration.md#selector-context).
+
+The adapter must obey the supplied contextual `systemPrompt`: return exactly `{"action":"classify","matches":["quick"]}` or `{"action":"continue","matches":[]}`. Continuation needs nonempty retained history and a previous role whose currently eligible model/effective effort exactly match `request.current`. A model claim alone cannot bypass scope, image capability, explicit pins, or manual pause. Changed intent requires reclassification; unverifiable continuation is `invalid_response` with fallback. Oldest optional history may be dropped to fit the selector budget; task and descriptions are never shortened.
+
+Optional `routing` metadata contains `mode`, `messages` (count), `historyBytes` (UTF-8 text only), and `truncated`. It never contains history text. Early precedence/validation outcomes may omit it. No new v2 event or implicit external-launcher integration is provided.
+
 ## Handle the decision
 
 | `status` | What to do |
@@ -119,6 +143,7 @@ The package exports all reason codes as `REASONS`:
 | --- | --- |
 | `explicit`, `manual`, `disabled` | Preserve a local choice without classification. |
 | `requested_role`, `default_only`, `matched` | Direct role/default selection or one valid semantic match. |
+| `continued` | Explicit contextual selection retained an unchanged, eligible current role for a same-task continuation. |
 | `no_match`, `ambiguous`, `invalid_response` | Use default fallback after evaluating the classifier response. |
 | `selector_failed`, `selector_timeout`, `selector_unavailable` | Selector transport, deadline, or availability problem. |
 | `input_too_large`, `insufficient_text`, `context_budget` | Skip classification and use default fallback. |
@@ -128,7 +153,7 @@ The package exports all reason codes as `REASONS`:
 
 Warnings are `effort_clamped`, `roles_unavailable`, and `default_unavailable`. Decisions contain no task text, role description, raw exception, classifier response, image content, prompt hash, or free-form model justification. Do not add those to your integration's logs.
 
-The ESM root exports `selectModelForTask`, `defaultConfig`, `EFFORTS`, `REASONS`, the versioned event helpers, and their TypeScript contracts. The internal menu/store are not public APIs.
+The ESM root exports `selectModelForTask`, `selectModelWithContext`, `defaultConfig`, `EFFORTS`, `REASONS`, the versioned event helpers, and their TypeScript contracts (including `RoutingContext` and `RoutingMetadata`). The internal menu/store are not public APIs.
 
 ## Select through Pi events
 
@@ -156,7 +181,7 @@ If your integration imports the library, `selectViaEvents(bus, sessionId, reques
 Important boundaries:
 
 - The matching owner validates the request and assigns the result Promise **synchronously**. Wrong session IDs are ignored; a populated result prevents duplicate owners from starting another request.
-- The owner uses its own configuration and baseline but **does not switch the parent model**. Parent manual pause is not automatically inherited by independent child requests; callers supply the child's explicit choices and pause state.
+- The owner uses its own configuration and baseline but **does not switch the parent model** or implicitly collect parent history; v1 stays prompt-only. Parent manual pause is not automatically inherited by independent child requests; callers supply the child's explicit choices and pause state.
 - Reload replaces the owner. Disposal cancels outstanding service results and removes its listener. Headless and known-child ambient instances register no automatic owner.
 - `registerSelectionService(bus, sessionId, handler)` lets an opt-in host offer the same service and returns a disposer. The handler must be bounded/cooperative to clean up its own resources.
 - This is advisory and process-local, not a security boundary. Promises and signals cannot be serialized into a remote request.

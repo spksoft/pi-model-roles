@@ -43,7 +43,7 @@ Settings and Auto Setup
 
 Automatic routing applies only to a new interactive prompt submitted while a primary TUI session is idle. This includes registered prompt templates such as `/plan <description>` and `/skill:name <task>`. It does not independently reroute tools, retries, steering, queued follow-ups, extension-generated messages, headless sessions, or known subagent children.
 
-This is an explicit host boundary: Pi 0.85.1 snapshots model/effort before its `context` hook. The package does not switch models there or project full conversation history for classification. It selects from submitted task text at `input`, before the supported pre-prompt preparation/dispatch boundary. See [per-turn compatibility](compatibility.md#per-turn-routing-is-not-supported).
+This is an explicit host boundary: Pi 0.85.1 snapshots model/effort before its `context` hook. The package does not switch models there or project full conversation history for classification. It selects at `input`, before the supported pre-prompt preparation/dispatch boundary, with submitted task text and optionally a bounded retained-conversation projection. See [per-turn compatibility](compatibility.md#per-turn-routing-is-not-supported).
 
 ```text
 New eligible prompt
@@ -53,6 +53,9 @@ New eligible prompt
   -> Are custom roles eligible?
      -> no: use default fallback without a classifier request
      -> yes: ask the resolved default model for matching role IDs
+  -> Conversation mode establishes unchanged task/role continuity?
+     -> yes: retain the still-eligible current assignment
+     -> no: evaluate role matches
   -> Exactly one valid match?
      -> yes: select that role
      -> no, invalid, ambiguous, failed, or timed out: use default fallback
@@ -62,9 +65,11 @@ New eligible prompt
 
 Slash-prefixed submissions are checked against Pi's current public `getCommands()` metadata. Only prompt-template and skill sources are eligible; extension-owned and unknown commands are not. Pi dispatches registered extension commands before `input`, so a command that shadows a template remains outside automatic routing. Existing command registrations and handlers are never replaced or re-registered. Metadata is read locally on each eligible slash submission, so resource reloads do not leave a stale allowlist.
 
-The selector sees only the submitted task text (including the raw command name and arguments) and the eligible custom-role IDs and descriptions. Command descriptions, source paths, and expanded template/skill bodies are not added. Pi expands the unchanged submission after routing; cancellation restores the original command, not its expansion. The selector receives neither image bytes nor automatically loaded conversation history, repository files, execution tools, or raw provider credentials. The selector must return strict JSON naming clear matches. Its output never becomes execution instructions.
+In default prompt mode, the selector sees submitted task text (including raw command/arguments) and eligible role IDs/descriptions only. Opt-in conversation mode adds the bounded active-branch projection from `src/pi/routing-context.ts`: recent user/assistant text and existing summaries, with raw thinking, tool calls/results, image bytes, and arbitrary custom entries excluded. Recognized Pi skill envelopes are reduced to their invocation; unmarked past template expansions and sensitive text copied into dialogue/summaries may remain. There are no new file reads or summarizer requests. The public `buildContextEntries()` projection respects compaction and retained tails, not abandoned branches. Context-window budget checks can discard oldest optional history, never the submitted task. See [context policy](configuration.md#selector-context).
 
-The selected model and effort remain active for the task's tools, retries, and queued follow-ups. The next eligible idle prompt starts again from the resolved default, not the previous task's execution model.
+Pi expands the unchanged submission after routing; cancellation restores the original command. Later extension injections and provider serialization are not visible at this boundary. A strict contextual result either classifies role matches or requests continuation; the latter requires retained dialogue and an unchanged eligible prior role/model/effort matching the current pair. History cannot grant model, tool, or provider permissions. Its semantic interpretation remains model judgment, not a deterministic correctness guarantee.
+
+The selected pair remains active for tools, retries, and queued follow-ups. The next eligible idle submission uses the default model as its selector; a clear same-task continuation in conversation mode may retain the prior execution pair. Otherwise the usual role-match/default fallback applies. Contextual results are discarded if branch/leaf or configuration revision changes during selection, and compaction invalidates pending selection. Receipts contain counts and reason codes, not copied conversation text.
 
 ## Explicit command routing
 
@@ -79,7 +84,7 @@ Explicit run while idle
   -> Original handler or normal template/skill expansion
 ```
 
-No target file or generated prompt is read for selection. Target-generated messages retain `source=extension`, so they do not trigger a second selector. An intervening agent start invalidates pending selection, as do manual changes, reload/navigation, and shutdown. Cancellation restores the wrapper text without dispatch. Once handed off, the original command owns execution, model overrides, permissions, and any child launches. Public dispatch is fire-and-forget; the wrapper neither reports target completion nor retries or rolls back target effects. See [command boundaries](compatibility.md#run-an-extension-owned-command).
+No target file or generated prompt is read for selection. This wrapper stays prompt-only even when idle-input conversation mode is enabled. Target-generated messages retain `source=extension`, so they do not trigger a second selector. An intervening agent start invalidates pending selection, as do manual changes, reload/navigation, and shutdown. Cancellation restores the wrapper text without dispatch. Once handed off, the original command owns execution, model overrides, permissions, and any child launches. Public dispatch is fire-and-forget; the wrapper neither reports target completion nor retries or rolls back target effects. See [command boundaries](compatibility.md#run-an-extension-owned-command).
 
 ## Precedence and fallback
 
@@ -100,6 +105,8 @@ A manual model or effort change disables Auto Selector for the session. The pack
 The durable state is a single YAML configuration file outside the installed package checkout. Settings creates the initial inherited `default` role only when the file is absent and the package runs in a primary interactive terminal session.
 
 Configuration is validated before routing and before saving. The store serializes writes in-process, uses an exclusive lock and revision check, writes a private same-directory temporary file, then replaces the destination atomically. Invalid files are retained for repair; they are not reset or overwritten automatically. Saved but currently unavailable roles remain intact and are skipped during eligibility checks.
+
+Toggle persistence uses a separate set-enabled transaction: acquire the same lock, read/validate the latest file, update only `enabled`, and atomically commit. Even a same-value request reads fresh state; a true no-op preserves existing bytes. Unrelated role edits survive, while role drafts and context-policy edits retain strict revision checks. Disable pins the local pair before persistence; failed enable remains paused. UI failures after a committed save cannot turn it into an uncommitted-save result.
 
 See [configuration](configuration.md) for the schema, path, limits, inheritance rules, and recovery instructions.
 

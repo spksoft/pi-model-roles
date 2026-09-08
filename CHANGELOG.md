@@ -4,6 +4,16 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ## 0.1.0 — Unreleased
 
+### Context-aware idle routing and reliable toggles
+
+- Fix enable/disable persistence: pause locally before saving, keep failed toggles paused, and resume enable only after a successful save in the unchanged session. Update only `enabled` against fresh locked disk state, preserving unrelated edits and checking same-value requests too. Role drafts remain revision-checked.
+- Report safe save error categories/fields and recovery guidance. Separate committed writes from later status/notification failures so a successful save is not reported as rolled back.
+- Add opt-in `selectorContext: conversation` and `/model-roles context [prompt|conversation]` with explicit sharing consent. Omitted/`prompt` stays prompt-only with unchanged initial YAML. Collect at most 12 retained active-branch text messages/summaries, 4 KiB each and 16 KiB total, with optional oldest-history removal for budget. No extra summarizer, tool calls, per-turn routing, or compaction changes.
+- Exclude raw thinking, tool calls/results, images, arbitrary custom entries and recognized skill bodies. Visible dialogue/summaries and unmarked template expansions can still contain sensitive copied text; this is not secret redaction. Opt-out does not undo prior transmission.
+- Introduce strict contextual classify/continue responses and validate continuation against the current eligible role/model/effort. Reclassify changed scope/intent; preserve explicit pins, manual state, image eligibility and safe fallback. Invalidate pending results on retained-history/configuration changes and compaction.
+- Add `/model-roles why` with metadata-only last-decision explanations and the explicit direct `selectModelWithContext` API. Existing v1 library/event APIs and the command wrapper remain prompt-only. Auto Setup describes but cannot change the context policy.
+- Add credential-free projection, protocol, SDK context/consent, persistence and recovery regressions; update user guidance and manual acceptance checks. Live semantic accuracy and visual terminal acceptance are not established by these tests.
+
 ### Explicit command routing
 
 - Add `/model-roles run /command [arguments]` to select/apply a parent model before invoking an existing extension-owned command such as `/execute-plan` through Pi's public API. No edits to Pi, planning packages, providers, or runners are required; original command names/handlers stay unchanged.
@@ -21,7 +31,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 - Withdraw the per-turn/full-history routing experiment: Pi 0.85.1 captures the dispatch model/effort before `context`, so switching there routed the actual call on the previous pair. Restore supported pre-submission idle-TUI routing and document excluded prompt sources.
 - Withdraw automatic pi-subagents background launching. `createPiSubagentsBackgroundBridge` and `piSubagentRoutingDiagnostic` report `automatic_child_routing_unsupported` without registration, RPC, timers, or launch. The old child entry is inert; explicit pre-launch selection remains available with caller pins/scopes and launcher authority preserved.
-- Keep skill/tool/history text out of automatic selector data, preserve Auto Setup research/refinement model and effort, and align live consent with task-only routing. Pasted task content is not secret-filtered.
+- Keep skill/tool/history text out of default prompt-only selector data, preserve Auto Setup research/refinement model and effort, and align live consent with the configured routing policy. Pasted task content is not secret-filtered.
 - Surface swallowed faux-provider callback assertions, assert actual dispatch pairs outside provider callbacks, and restore compaction/queue/application-race regressions. Add synthetic skill/file privacy, empty/image-only input, and fail-closed bridge coverage. No live-provider or visual TUI acceptance is claimed.
 
 ### Auto Setup
@@ -54,7 +64,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 ### Configuration and privacy
 
 - Save roles in a user-wide YAML file outside the installed package so they survive updates and removal. Detect invalid configuration and conflicting saves without silently overwriting user data.
-- Send task text and role descriptions to the selector, not conversation history or images. Role descriptions do not become execution instructions. The selected execution provider receives Pi's normal conversation and attachments.
+- By default send task text and role descriptions to the selector, not conversation history or images. The opt-in bounded conversation mode is described above. Role descriptions do not become execution instructions. The selected execution provider receives Pi's normal conversation and attachments.
 - Report safe decision details and separate selector usage without creating a routing log or duplicating task text in routing metadata.
 
 ### Integrations and documentation

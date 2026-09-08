@@ -21,6 +21,8 @@ export interface RoleConfig {
   version: 1;
   enabled: boolean;
   selectorTimeoutMs: number;
+  /** Idle-TUI routing data policy; omitted means prompt. Library v1 calls stay prompt-only. */
+  selectorContext?: "prompt" | "conversation";
   roles: { default: DefaultRole } & Record<string, DefaultRole | CustomRole>;
 }
 export interface AvailableModel {
@@ -36,6 +38,7 @@ export const REASONS = [
   "requested_role",
   "default_only",
   "matched",
+  "continued",
   "no_match",
   "ambiguous",
   "invalid_response",
@@ -67,7 +70,21 @@ export interface SelectorMetadata {
   durationMs: number;
   usage?: SelectorUsage;
 }
+export interface RoutingContext {
+  version: 1;
+  messages: Array<{ kind: "user" | "assistant" | "summary"; text: string }>;
+  truncated: boolean;
+  previousRole?: string;
+}
+/** Non-content receipt only: safe to persist without copying conversation text. */
+export interface RoutingMetadata {
+  mode: "prompt" | "conversation";
+  messages: number;
+  historyBytes: number;
+  truncated: boolean;
+}
 interface DecisionBase {
+  routing?: RoutingMetadata;
   reason: Reason;
   fallback: boolean;
   warnings: Warning[];

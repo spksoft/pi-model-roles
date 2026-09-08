@@ -1,11 +1,18 @@
 import type { ExtensionAPI, ExtensionContext, InputEvent } from "@earendil-works/pi-coding-agent";
 import type { ConfigStore } from "../config/store.js";
 import { displayModel, modelKey, sameModel } from "../core/model-identity.js";
-import { fallbackDecision, selectModelForTask, unavailable } from "../core/selection.js";
+import {
+  fallbackDecision,
+  selectModelForTask,
+  selectModelWithContext,
+  unavailable,
+} from "../core/selection.js";
+import { projectRoutingContext } from "./routing-context.js";
 import type {
   Effort,
   ModelRef,
   ModelState,
+  RoutingContext,
   SelectionDecision,
   SelectionDependencies,
   SelectionRequest,
@@ -62,6 +69,16 @@ export class RolesController {
     this.generation++;
     this.pending?.abort();
   }
+  /** Guard a settings operation across awaits without resuming a replaced/manual session. */
+  captureGuard(ctx: ExtensionContext): () => boolean {
+    const generation = this.generation;
+    const session = this.sessionId;
+    return () =>
+      this.active &&
+      this.generation === generation &&
+      this.sessionId === session &&
+      ctx.sessionManager.getSessionId() === session;
+  }
   agentStarted(): void {
     // Another extension can start work while an idle selector is awaiting a provider.
     if (this.pending) this.invalidate();
@@ -104,11 +121,17 @@ export class RolesController {
       requiresImages: historyRequiresImages(ctx),
     };
   }
-  async select(ctx: ExtensionContext, request: SelectionRequest): Promise<SelectionDecision> {
+  async select(
+    ctx: ExtensionContext,
+    request: SelectionRequest,
+    context?: RoutingContext,
+  ): Promise<SelectionDecision> {
     const dependencies = this.dependencies(ctx);
-    return dependencies
-      ? selectModelForTask({ ...request, baseline: this.baseline }, dependencies)
-      : unavailable("config_invalid");
+    if (!dependencies) return unavailable("config_invalid");
+    const resolved = { ...request, baseline: this.baseline };
+    return context
+      ? selectModelWithContext(resolved, dependencies, context)
+      : selectModelForTask(resolved, dependencies);
   }
   private persist(ctx: ExtensionContext): void {
     if (!this.active) return;
@@ -264,6 +287,7 @@ export class RolesController {
                   ...fallback,
                   effort: currentState(ctx).effort,
                   selector: decision.selector,
+                  routing: decision.routing,
                 };
             }
           } catch {
@@ -335,6 +359,7 @@ export class RolesController {
     event: Pick<InputEvent, "text" | "images">,
     ctx: ExtensionContext,
     restoreText = event.text,
+    useConversation = true,
   ): Promise<{ action: "continue" | "handled" }> {
     if (this.mode === "manual" || !this.store.snapshot?.config.enabled)
       return { action: "continue" };
@@ -352,10 +377,22 @@ export class RolesController {
     try {
       const request = this.request(ctx, event.text, controller.signal);
       request.requiresImages ||= Boolean(event.images?.length);
-      const work = () => this.select(ctx, request);
-      const manyRoles = Object.keys(this.store.snapshot.config.roles).length > 1;
+      const snapshot = this.store.snapshot;
+      const leaf = ctx.sessionManager.getLeafId();
+      const manyRoles = Object.keys(snapshot.config.roles).length > 1;
+      const context =
+        useConversation && manyRoles && snapshot.config.selectorContext === "conversation"
+          ? projectRoutingContext(ctx.sessionManager.buildContextEntries(), this.role)
+          : undefined;
+      const work = () => this.select(ctx, request, context);
       let decision = manyRoles ? await withSelectionLoader(ctx, controller, work) : await work();
-      if (token !== this.generation || controller.signal.aborted || !ctx.isIdle())
+      if (
+        token !== this.generation ||
+        controller.signal.aborted ||
+        !ctx.isIdle() ||
+        snapshot.revision !== this.store.snapshot?.revision ||
+        (context && leaf !== ctx.sessionManager.getLeafId())
+      )
         decision = unavailable("cancelled", true);
       if (decision.status !== "cancelled")
         decision = await this.apply(ctx, decision, request, token);
@@ -406,7 +443,8 @@ export class RolesController {
         return;
       }
       const target = structuredClone(discovered);
-      const result = await this.routeSubmission({ text }, ctx, restoreText);
+      // Keep the existing command-wrapper data contract prompt-only.
+      const result = await this.routeSubmission({ text }, ctx, restoreText, false);
       if (result.action === "handled") return;
       if (
         !this.active ||

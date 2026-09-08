@@ -14,6 +14,20 @@ test("YAML round-trips default and multiline Unicode criteria", () => {
   assert.deepEqual(parseConfig(serializeConfig(value)), value);
   assert.deepEqual(parseConfig(serializeConfig(defaultConfig())), defaultConfig());
 });
+test("selector context is opt-in, round-trips both modes, and rejects invalid values", () => {
+  assert.equal(defaultConfig().selectorContext, undefined);
+  assert.doesNotMatch(serializeConfig(defaultConfig()), /selectorContext/);
+  for (const selectorContext of ["prompt", "conversation"] as const) {
+    const value = { ...config(), selectorContext };
+    assert.deepEqual(parseConfig(serializeConfig(value)), value);
+  }
+  for (const selectorContext of [true, false, null, "full", "", {}]) {
+    assert.throws(
+      () => validateConfig({ ...config(), selectorContext }),
+      /invalid_selector_context: selectorContext/,
+    );
+  }
+});
 for (const yaml of [
   "version: 2",
   "version: 1\nroles: {}",

@@ -152,6 +152,7 @@ test("context is deterministic, escaped, allowlisted routing data without mutati
   const currentConfig = defaultConfig();
   currentConfig.enabled = false;
   currentConfig.selectorTimeoutMs = 15000;
+  currentConfig.selectorContext = "conversation";
   currentConfig.roles.zeta = {
     model: { provider: "fixture/route", id: "base/model" },
     effort: "low",
@@ -172,10 +173,13 @@ test("context is deterministic, escaped, allowlisted routing data without mutati
   const parsed = section(prompt, configHeading) as {
     enabled: boolean;
     selectorTimeoutMs: number;
+    selectorContext: string;
     roles: Array<{ id: string; description?: string; model: unknown }>;
   };
   assert.equal(parsed.enabled, false);
   assert.equal(parsed.selectorTimeoutMs, 15000);
+  assert.equal(parsed.selectorContext, "conversation");
+  assert.match(prompt, /Auto Setup cannot opt users into conversation sharing/);
   assert.deepEqual(
     parsed.roles.map(({ id }) => id),
     ["alpha", "default", "zeta"],

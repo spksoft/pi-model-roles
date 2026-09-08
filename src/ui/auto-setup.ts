@@ -164,7 +164,7 @@ export async function startAutoSetup(
   if (
     !(await ctx.ui.confirm(
       "Start Auto Setup research?",
-      `Research uses the current Pi model (${current}) and its normal conversation/provider data flow. The generated prompt includes selected model capabilities and your current role descriptions, assignments, enabled state, and selector timeout for comparison; do not keep secrets in role descriptions. Research guidance tells the agent to use only public model identities in searches, but is not an enforcement boundary. Configured tools may make web requests, incur their own costs, and retain data under their policies. This package does not add credentials, change tool permissions, or sandbox the normal agent. If web research is unavailable, the agent may use explicitly labelled offline knowledge. Research consent is separate from future task-routing charges and configuration saving.`,
+      `Research uses the current Pi model (${current}) and its normal conversation/provider data flow. The generated prompt includes selected model capabilities and your current role descriptions, assignments, enabled state, selector timeout, and selector context policy for comparison; do not keep secrets in role descriptions. Research guidance tells the agent to use only public model identities in searches, but is not an enforcement boundary. Configured tools may make web requests, incur their own costs, and retain data under their policies. This package does not add credentials, change tool permissions, or sandbox the normal agent. If web research is unavailable, the agent may use explicitly labelled offline knowledge. Research consent is separate from future task-routing charges and configuration saving.`,
     ))
   )
     return false;

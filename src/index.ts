@@ -1,6 +1,6 @@
 /** Side-effect-free API: importing this module does not register a Pi extension. */
 export { defaultConfig } from "./core/defaults.js";
-export { selectModelForTask } from "./core/selection.js";
+export { selectModelForTask, selectModelWithContext } from "./core/selection.js";
 export { EFFORTS, REASONS } from "./core/types.js";
 export type {
   AvailableModel,
@@ -13,6 +13,8 @@ export type {
   ModelState,
   Reason,
   RoleConfig,
+  RoutingContext,
+  RoutingMetadata,
   SelectionDecision,
   SelectionDependencies,
   SelectionRequest,

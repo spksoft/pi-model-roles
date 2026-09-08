@@ -55,7 +55,9 @@ export class ConfigStore {
     } catch (error) {
       if (errorCode(error) === "ENOENT") return undefined;
       if (error instanceof ConfigError) throw error;
-      throw new ConfigError("read_failed");
+      throw new ConfigError(
+        ["EACCES", "EPERM"].includes(errorCode(error) ?? "") ? "permission_denied" : "read_failed",
+      );
     }
   }
   async load(initialize = false): Promise<ConfigSnapshot | undefined> {
@@ -87,7 +89,22 @@ export class ConfigStore {
   /** expected=null means create only. Invalid files require reset(), never an implicit overwrite. */
   save(config: RoleConfig, expected: string | null): Promise<ConfigSnapshot> {
     const text = serializeConfig(config);
-    const work = this.tail.then(() => this.replace(text, expected));
+    return this.enqueue((current) => {
+      if ((current === undefined ? null : revision(current)) !== expected)
+        throw new ConfigError("conflict");
+      return text;
+    });
+  }
+  /** Set only enabled against fresh disk state under the lock; never rebase role drafts. */
+  setEnabled(enabled: boolean): Promise<ConfigSnapshot> {
+    return this.enqueue((current) => {
+      if (current === undefined) throw new ConfigError("config_missing");
+      const config = parseConfig(current);
+      return config.enabled === enabled ? current : serializeConfig({ ...config, enabled });
+    });
+  }
+  private enqueue(update: (current: string | undefined) => string): Promise<ConfigSnapshot> {
+    const work = this.tail.then(() => this.replace(update));
     this.tail = work.catch(() => undefined);
     return work;
   }
@@ -96,7 +113,7 @@ export class ConfigStore {
     const text = await this.raw();
     return this.save(defaultConfig(), text === undefined ? null : revision(text));
   }
-  private async replace(text: string, expected: string | null): Promise<ConfigSnapshot> {
+  private async replace(update: (current: string | undefined) => string): Promise<ConfigSnapshot> {
     const directory = dirname(this.path);
     const lock = `${this.path}.lock`;
     const temp = join(directory, `.config-${randomUUID()}.tmp`);
@@ -115,8 +132,17 @@ export class ConfigStore {
         }
       }
       const current = await this.raw();
-      if ((current === undefined ? null : revision(current)) !== expected)
-        throw new ConfigError("conflict");
+      const text = update(current);
+      // Parse before committing so a post-commit validation error cannot look like a failed write.
+      const snapshot = Object.freeze({
+        config: freezeConfig(parseConfig(text)),
+        revision: revision(text),
+      });
+      if (current === text) {
+        this.snapshot = snapshot;
+        this.error = undefined;
+        return snapshot;
+      }
       const file = await open(temp, "wx", 0o600);
       try {
         await file.writeFile(text);
@@ -136,15 +162,17 @@ export class ConfigStore {
       } catch {
         /* best effort */
       }
-      const snapshot = Object.freeze({
-        config: freezeConfig(parseConfig(text)),
-        revision: revision(text),
-      });
       this.snapshot = snapshot;
       this.error = undefined;
       return snapshot;
     } catch (error) {
-      throw error instanceof ConfigError ? error : new ConfigError("save_failed");
+      throw error instanceof ConfigError
+        ? error
+        : new ConfigError(
+            ["EACCES", "EPERM"].includes(errorCode(error) ?? "")
+              ? "permission_denied"
+              : "save_failed",
+          );
     } finally {
       await unlink(temp).catch(() => undefined);
       if (locked) await rmdir(lock).catch(() => undefined);

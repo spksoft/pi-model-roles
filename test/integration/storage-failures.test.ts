@@ -78,7 +78,8 @@ test("unwritable storage is a bounded error", {
     const snap = await store.load(true);
     assert.ok(snap);
     await chmod(dirname(store.path), 0o500);
-    await assert.rejects(store.save(config(), snap.revision), /save_failed/);
+    await assert.rejects(store.save(config(), snap.revision), /permission_denied/);
+    await assert.rejects(store.setEnabled(false), /permission_denied/);
     assert.deepEqual(parseConfig(await readFile(store.path, "utf8")), snap.config);
   } finally {
     await chmod(dirname(store.path), 0o700);

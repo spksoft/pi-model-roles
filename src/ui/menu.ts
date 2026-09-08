@@ -6,9 +6,15 @@ import { availableModels } from "../pi/adapters.js";
 import type { AutoSetupController } from "../pi/auto-setup-controller.js";
 import type { RolesController } from "../pi/controller.js";
 import { reviewAutoSetup, startAutoSetup } from "./auto-setup.js";
-import { confirmFirstCustomRoleRouting, saveRoleConfig } from "./config-save.js";
+import {
+  confirmFirstCustomRoleRouting,
+  notifySafely,
+  saveFailure,
+  saveRoleConfig,
+} from "./config-save.js";
 import { showRoleDashboard } from "./role-dashboard.js";
 import { selectModel } from "./model-picker.js";
+import { configureRoutingContext, explainRouting } from "./routing-settings.js";
 
 export function roleSummary(id: string, role: DefaultRole): string {
   return `${id} · ${role.model === "inherit" ? "Pi default" : displayModel(role.model)} · ${role.effort}`;
@@ -122,34 +128,52 @@ async function setAutoSelector(
   ctx: ExtensionContext,
   enabled: boolean,
 ): Promise<void> {
-  const snapshot = controller.store.snapshot;
-  if (!snapshot) {
-    if (!enabled) controller.disable(ctx);
-    ctx.ui.notify(
-      enabled
-        ? "Auto Selector cannot be enabled until the role configuration is valid."
-        : "Auto Selector disabled for this session. The current model and effort stay selected.",
-      enabled ? "warning" : "info",
+  // Pause first, including failed enable attempts. Persistence must not defeat local disable.
+  try {
+    controller.disable(ctx);
+  } catch {
+    // disable sets the local mode/pin before persisting its receipt or updating the UI.
+    notifySafely(
+      ctx,
+      "Auto Selector paused locally, but its session receipt could not be saved.",
+      "warning",
+    );
+  }
+  const current = controller.captureGuard(ctx);
+  try {
+    await controller.store.setEnabled(enabled);
+  } catch (error) {
+    notifySafely(
+      ctx,
+      `Auto Selector disabled for this session; global setting was not saved. ${saveFailure(error, controller.store.path)}`,
+      "warning",
     );
     return;
   }
-  if (snapshot.config.enabled !== enabled) {
-    const saved = await saveRoleConfig(
-      controller,
+  if (!current()) {
+    notifySafely(
       ctx,
-      { ...snapshot.config, enabled },
-      snapshot.revision,
+      "Global Auto Selector setting saved; intervening session changes were preserved. Check the footer before continuing.",
+      "warning",
     );
-    if (!saved) return;
+    return;
   }
-  if (enabled) controller.resume(ctx);
-  else controller.disable(ctx);
-  ctx.ui.notify(
-    enabled
-      ? "Auto Selector enabled. Future eligible prompts may route to another role."
-      : "Auto Selector disabled. The selected role, model, and effort stay in use.",
-    "info",
-  );
+  try {
+    if (enabled) controller.resume(ctx);
+    else controller.status(ctx);
+    ctx.ui.notify(
+      enabled
+        ? "Auto Selector enabled and global setting saved. Future eligible prompts may route to another role."
+        : "Auto Selector disabled and global setting saved. The selected role, model, and effort stay in use.",
+      "info",
+    );
+  } catch {
+    notifySafely(
+      ctx,
+      "Global Auto Selector setting saved, but the session/UI receipt could not refresh. Reload and check the footer; do not retry the write.",
+      "warning",
+    );
+  }
 }
 
 export async function showMenu(
@@ -221,9 +245,12 @@ export async function handleCommand(
   else if (action === "enable" && !parts[1]) await setAutoSelector(controller, ctx, true);
   else if (action === "disable" && !parts[1]) await setAutoSelector(controller, ctx, false);
   else if (action === "use" && parts[1] && !parts[2]) await controller.use(ctx, parts[1]);
+  else if (action === "context" && !parts[2])
+    await configureRoutingContext(controller, ctx, parts[1]);
+  else if (action === "why" && !parts[1]) explainRouting(controller, ctx);
   else
     ctx.ui.notify(
-      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, or /model-roles run /command [arguments].",
+      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, /model-roles context [prompt|conversation], /model-roles why, or /model-roles run /command [arguments].",
       "info",
     );
 }

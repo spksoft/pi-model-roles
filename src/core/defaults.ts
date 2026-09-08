@@ -7,6 +7,9 @@ export const LIMITS = Object.freeze({
   modelField: 512,
   outputBytes: 16384,
   outputTokens: 2048,
+  historyBytes: 16384,
+  historyMessageBytes: 4096,
+  historyMessages: 12,
 });
 export const ROLE_ID = /^[a-z][a-z0-9_-]{0,47}$/;
 export const RESERVED_IDS = new Set(["constructor", "prototype", "__proto__"]);
