@@ -10,9 +10,11 @@ import { ConfigStore } from "../../src/config/store.js";
 import { createPiSubagentsBackgroundBridge } from "../../src/integrations/pi-subagents.js";
 import { config, FAST } from "../support/fixtures.js";
 import { sdkHarness } from "../support/sdk.js";
+import { assertNativeSubagentParentContext } from "../support/native-subagent-context.js";
 test("pi-subagents 0.65.1: native public delegation receives selected model and explicit effort", {
   timeout: 35000,
 }, async () => {
+  assertNativeSubagentParentContext();
   let pi: ExtensionAPI | undefined;
   const tempRoot = await mkdtemp(join(tmpdir(), "roles-subagents-"));
   const previousRoot = process.env.PI_SUBAGENTS_TEMP_ROOT;

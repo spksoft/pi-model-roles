@@ -88,8 +88,10 @@ Precedence is **explicit model/effort → paused → requested role → disabled
 | --- | --- |
 | `config: RoleConfig` | Version-1 configuration. A validated copy is used per call; see the [configuration reference](configuration.md#configuration-reference-version-1). |
 | `models(): readonly AvailableModel[]` | A synchronous, cached eligible registry. Entries contain `ref`, supported `efforts`, `images`, and `contextWindow`. Selection reads it again before returning a final result. Do not perform network discovery here. |
-| `classify(input): Promise<{text, usage?}>` | A standalone selection request using the exact supplied model. Input includes `systemPrompt`, bounded JSON `text`, `signal`, and `maxTokens`. Forward cancellation; do not add execution tools/history or log raw errors. |
+| `classify(input): Promise<{text, usage?}>` | A standalone selection request using the exact supplied model. Input includes `systemPrompt`, bounded JSON `text`, `signal`, `maxTokens`, and optional `effort`. Forward cancellation; do not add execution tools/history or log raw errors. |
 | `defaultEffort?(model): Effort` | Per-model inherited effort. If omitted, baseline effort is used. |
+| `supportsSelectorEffort?(model, effort): boolean` | Optional adapter restriction in addition to cached model effort support; absent means capability list alone unless a required selector effort is declared. Return false when explicit forwarding is unsupported. |
+| `requiredSelectorEffort?(model): Effort \| undefined` | Explicit scoped selector pin, not inferred from supported levels. Default: no requirement. A pin requires matching configured effort and `supportsSelectorEffort` returning true; otherwise no classifier call. Adapters must repeat this guard before transmission. |
 | `now?(): number` | Numeric clock for durations; defaults to `Date.now`. |
 
 The classifier must return strict JSON such as `{"matches":["quick"]}`. See [protocol limits](configuration.md#advanced-limits-and-safeguards). Timeout settles selection even if an adapter ignores cancellation; late results are ignored, but adapters should cooperate to stop their own work.
@@ -118,7 +120,7 @@ The integration owns consent, privacy, projection, and final application checks.
 
 The adapter must obey the supplied contextual `systemPrompt`: return exactly `{"action":"classify","matches":["quick"]}` or `{"action":"continue","matches":[]}`. Continuation needs nonempty retained history and a previous role whose currently eligible model/effective effort exactly match `request.current`. A model claim alone cannot bypass scope, image capability, explicit pins, or manual pause. Changed intent requires reclassification; unverifiable continuation is `invalid_response` with fallback. Oldest optional history may be dropped to fit the selector budget; task and descriptions are never shortened.
 
-Optional `routing` metadata contains `mode`, `messages` (count), `historyBytes` (UTF-8 text only), and `truncated`. It never contains history text. Early precedence/validation outcomes may omit it. No new v2 event or implicit external-launcher integration is provided.
+Optional `routing` metadata contains `mode`, `messages` (count), `historyBytes` (UTF-8 text only), `truncated`, and optional `budgetRemovedMessages` (oldest messages removed for selector budget, zero when none). It never contains history text. Early precedence/validation outcomes may omit it. No new v2 event or implicit external-launcher integration is provided.
 
 ## Handle the decision
 
@@ -131,7 +133,7 @@ Optional `routing` metadata contains `mode`, `messages` (count), `historyBytes` 
 
 Every result has `reason`, `fallback`, and safe `warnings`. Successful results also have an exact `model`, effective `effort`, `requestedEffort`, and optional `role`.
 
-Optional `selector` metadata contains its model, nonnegative `durationMs`, and numeric `usage: {input, output, totalTokens, cost}` when the adapter supplies it. This measures selection, not task execution, and may not appear in Pi's normal execution totals.
+Optional `selector` metadata contains its model, optional explicit `effort`, nonnegative `durationMs`, and numeric `usage: {input, output, totalTokens, cost}` when the adapter supplies it. This measures selection, not task execution, and may not appear in Pi's normal execution totals.
 
 Use `status` and `fallback` to decide what to do; use `reason` to explain the path. Normal fallback is **configured default → inherited baseline → current**, deduplicated by exact identity. No arbitrary model is chosen, and no task is replayed.
 
@@ -145,6 +147,7 @@ The package exports all reason codes as `REASONS`:
 | `requested_role`, `default_only`, `matched` | Direct role/default selection or one valid semantic match. |
 | `continued` | Explicit contextual selection retained an unchanged, eligible current role for a same-task continuation. |
 | `no_match`, `ambiguous`, `invalid_response` | Use default fallback after evaluating the classifier response. |
+| `selector_effort_unsupported` | Explicit selector effort is unsupported by cached model capabilities or the adapter; no classification or selector-provider retry. |
 | `selector_failed`, `selector_timeout`, `selector_unavailable` | Selector transport, deadline, or availability problem. |
 | `input_too_large`, `insufficient_text`, `context_budget` | Skip classification and use default fallback. |
 | `role_unavailable`, `no_usable_model` | Requested role is unusable, or no permitted fallback remains. |
@@ -223,4 +226,10 @@ The example registers a uniquely named, model-unpinned native demo agent through
 
 Response identity is correlated by request/owner/node; cancellation uses pi-subagents' protocol. Registrations are disposed on shutdown. Missing/incompatible owners are reported rather than replaced. The exported `delegateExample` also accepts explicit `{model, effort}` pins; production callers must resolve their own agent/run defaults first.
 
-Automated tests cover native fake-provider child execution, exact IDs and effort forwarding, explicit pins, and parent isolation. Foreground children need providers loaded in their own runtime; they do not inherit all parent extensions. Known `PI_SUBAGENT_CHILD` copies of this package remain inactive. This example does not establish compatibility with arbitrary external CLI runners or uninstrumented subagent tools.
+Automated tests cover native fake-provider child execution, exact IDs and effort forwarding, explicit pins, and parent isolation. Run these tests from a normal parent process: pi-subagents 0.65.1 disables its event owner when imported with `PI_SUBAGENT_CHILD=1`, before any SDK fixture setup. A later environment change does not initialize that owner. See [verification context and safe recovery](compatibility.md#native-subagent-verification-context); do not remove safety flags to enable delegation. Foreground children need providers loaded in their own runtime; they do not inherit all parent extensions. Known `PI_SUBAGENT_CHILD` copies of this package remain inactive. This example does not establish compatibility with arbitrary external CLI runners or uninstrumented subagent tools.
+
+## Independent selector and evaluation additions
+
+`RoleConfig.selector?: {model: ModelRef; effort?: Effort}` selects an independent classifier identity without changing execution defaults. Absence preserves the existing default-role classifier and **omits** `ClassifierInput.effort` entirely. Existing adapters remain source-compatible. Adapters using an explicit effort must forward it faithfully or advertise rejection via `supportsSelectorEffort`; silently ignoring it is not supported. Failure uses the existing execution fallback order, not another selector provider. See [configuration and Pi forwarding limits](configuration.md#independent-selector-profile). `SelectorProfile` is exported as a type. No request/event schema fields were added; v1 and command-wrapper calls remain prompt-only.
+
+`pi-model-roles/evaluation` exports `evaluateRouting`, `EVALUATION_LIMITS`, `EvaluationInput`, `EvaluationCase` and `EvaluationRow`; `pi-model-roles/evaluation/fixtures` exports `syntheticEvaluation()`. These side-effect-free subpaths never discover providers/credentials or launch work. Supply a classifier adapter explicitly; see the [bounded evaluation contract and minimal trial example](selector-evaluation.md). Neither importing the extension nor running normal selection starts evaluation.

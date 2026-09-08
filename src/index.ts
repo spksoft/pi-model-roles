@@ -19,6 +19,7 @@ export type {
   SelectionDependencies,
   SelectionRequest,
   SelectorMetadata,
+  SelectorProfile,
   SelectorUsage,
   Warning,
 } from "./core/types.js";

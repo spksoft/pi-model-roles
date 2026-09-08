@@ -295,3 +295,73 @@ test("oldest context is dropped for budget; prompt-only API ignores context conf
   };
   assert.equal((await selectModelForTask(active(), deps)).reason, "matched");
 });
+
+test("projection receipts separate clipping, excluded categories, partial observations and unknown summary freshness", async () => {
+  const { projectRoutingInput } = await import("../../src/pi/routing-context.js");
+  const { context, receipt } = projectRoutingInput([
+    { type: "custom", data: { secret: "PRIVATE_CUSTOM_SENTINEL" } },
+    {
+      type: "compaction",
+      summary: "Summary freshness cannot be verified",
+      retainedTail: [{ role: "toolResult", content: "PRIVATE_TOOL_SENTINEL" }],
+    },
+    {
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "PRIVATE_THINKING_SENTINEL" },
+          { type: "image", data: "PRIVATE_IMAGE_SENTINEL" },
+          { type: "text", text: "Visible" },
+        ],
+      },
+    },
+    {
+      type: "message",
+      message: {
+        role: "user",
+        content: '<skill name="demo" location="private">\nPRIVATE_SKILL_SENTINEL\n</skill>',
+      },
+    },
+  ]);
+  assert.deepEqual(receipt.included, { user: 1, assistant: 1, summary: 1 });
+  assert.deepEqual(receipt.omitted, {
+    tools: 1,
+    reasoning: 1,
+    images: 1,
+    custom: 1,
+    skillBodies: 1,
+  });
+  assert.equal(receipt.byteLimit, false);
+  assert.equal(receipt.summaryFreshness, "unknown");
+  assert.equal(receipt.observationsPartial, false);
+  assert.ok(validRoutingContext(context));
+  assert.doesNotMatch(JSON.stringify(receipt), /PRIVATE_|freshness cannot|Visible/);
+  assert.equal(validRoutingContext({ ...context, receipt }), false);
+  const clipped = projectRoutingInput(
+    Array.from({ length: 20 }, () => ({
+      type: "message",
+      message: { role: "user", content: "a" },
+    })),
+  );
+  assert.equal(clipped.receipt.messageLimit, true);
+  assert.equal(clipped.receipt.observationsPartial, true);
+  const exhausted = projectRoutingInput(
+    Array.from({ length: 5000 }, () => ({ type: "custom", data: "DO_NOT_READ" })),
+  );
+  assert.equal(exhausted.receipt.omitted.custom, 4096);
+  assert.equal(exhausted.receipt.observationsPartial, true);
+  const deps = dependencies();
+  deps.models = () => MODELS.map((model) => ({ ...model, contextWindow: 8000 }));
+  const projected = projectRoutingInput([
+    { type: "message", message: { role: "user", content: "界".repeat(5000) } },
+  ]);
+  assert.equal(projected.receipt.byteLimit, true);
+  deps.classify = async (input) => {
+    assert.doesNotMatch(input.text, /observationsPartial|included|byteLimit|budgetRemovedMessages/);
+    return { text: '{"action":"classify","matches":[]}' };
+  };
+  const result = await selectModelWithContext(request(), deps, projected.context);
+  assert.equal(result.routing?.budgetRemovedMessages, 1);
+  assert.equal(projected.context.messages.length, 1);
+});

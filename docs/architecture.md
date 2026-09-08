@@ -21,7 +21,7 @@ Pi input and lifecycle events
   -> RolesController
      -> cached Pi adapters and configuration snapshot
      -> pure selection policy
-     -> optional default-model classifier
+     -> optional independent-profile or default-model classifier
      -> apply selected model and effort through Pi
 
 Settings and Auto Setup
@@ -52,7 +52,7 @@ New eligible prompt
      -> no: resolve eligible roles from cached availability
   -> Are custom roles eligible?
      -> no: use default fallback without a classifier request
-     -> yes: ask the resolved default model for matching role IDs
+     -> yes: ask the independent selector or resolved default model for matching role IDs
   -> Conversation mode establishes unchanged task/role continuity?
      -> yes: retain the still-eligible current assignment
      -> no: evaluate role matches
@@ -69,7 +69,7 @@ In default prompt mode, the selector sees submitted task text (including raw com
 
 Pi expands the unchanged submission after routing; cancellation restores the original command. Later extension injections and provider serialization are not visible at this boundary. A strict contextual result either classifies role matches or requests continuation; the latter requires retained dialogue and an unchanged eligible prior role/model/effort matching the current pair. History cannot grant model, tool, or provider permissions. Its semantic interpretation remains model judgment, not a deterministic correctness guarantee.
 
-The selected pair remains active for tools, retries, and queued follow-ups. The next eligible idle submission uses the default model as its selector; a clear same-task continuation in conversation mode may retain the prior execution pair. Otherwise the usual role-match/default fallback applies. Contextual results are discarded if branch/leaf or configuration revision changes during selection, and compaction invalidates pending selection. Receipts contain counts and reason codes, not copied conversation text.
+The selected pair remains active for tools, retries, and queued follow-ups. The next eligible idle submission uses the independent profile (or default model when absent) as its selector; a clear same-task continuation in conversation mode may retain the prior execution pair. Otherwise the usual role-match/default fallback applies. Contextual results are discarded if branch/leaf or configuration revision changes during selection, and compaction invalidates pending selection. Receipts contain counts and reason codes, not copied conversation text.
 
 ## Explicit command routing
 
@@ -137,3 +137,11 @@ The optional pi-subagents example selects before delegation and forwards the sel
 ## Known boundary
 
 Pi owns model switching, authentication, context preparation, compaction, attachment handling, and task execution. The package checks state before and after its own asynchronous work, but a Pi model switch already in progress cannot be made fully atomic with session changes or shutdown under the tested public Pi API. See the [model-switch limitation](compatibility.md#model-switch-limitation).
+
+## Selector profile, privacy scope and evaluation
+
+The optional selector profile is declarative configuration, resolved independently from execution role state. Core rejects unsupported explicit selector effort; Pi adapts only verified API-specific forwarding. No selector-provider retry or network discovery is added. Scoped Pi execution effort pins constrain the eligible effort list. Default-only and existing precedence bypasses are unchanged; no new equivalent-pair shortcut is installed because role continuation receipts require a separate equivalence proof.
+
+`src/pi/context-policy.ts` owns a versioned process singleton keyed by agent directory and logical session UUID, not a host instance. It stores policy enums and revisions only, never writes files or Pi entries, survives module reload, refuses capacity overflow and preserves revision tombstones. Controller reads effective policy for every submission and checks its revision through application. Unrelated global/profile/Auto Setup saves never reset this explicit override. See [lifetime and sharing rules](configuration.md#logical-session-context-override-process-only).
+
+`projectRoutingInput()` returns strict context plus separate non-content projection observations. Only context enters core; `/why` displays the observations separately from core budget trimming. The pressure advisory reads public host usage on demand and never invokes compaction. `src/evaluation/` is an explicitly invoked sequential paired selector harness with hard ceilings, not an agent runner, semantic benchmark result or execution-quality measurement. See [evidence status](selector-evaluation.md).

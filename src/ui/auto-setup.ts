@@ -116,7 +116,8 @@ async function applyDraft(
     )
       return;
   }
-  if (!(await confirmFirstCustomRoleRouting(ctx, snapshot.config, merged.config))) return;
+  if (!(await confirmFirstCustomRoleRouting(ctx, snapshot.config, merged.config, controller)))
+    return;
   if (
     !(await ctx.ui.confirm(
       "Save Auto Setup role changes?",

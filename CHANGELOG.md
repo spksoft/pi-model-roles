@@ -4,6 +4,18 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ## 0.1.0 — Unreleased
 
+### Native integration verification
+
+- Fail fast with an actionable parent-context diagnostic when the native pi-subagents test is invoked in a child process. Document the pi-subagents 0.65.1 import-time event-owner constraint instead of misattributing the example's 30-second no-response timeout to child execution. Preserve all native completion/model/effort assertions and launcher safety policies; no parent runtime routing change.
+
+### Bounded selector upgrades
+
+- Require explicit matching, verified selector effort for scoped thinking pins; refuse unverified configured-provider streamSimple effort forwarding. Reject coercible evaluation labels/malformed records and stop on configured selector deadlines even without a usable fallback.
+- Add an optional independent selector model/effort profile and `/model-roles selector` choose/reset disclosure flow. Preserve legacy options when absent, exact scope, execution defaults and Auto Setup settings. Explicit unsupported effort falls back without a selector-provider retry; Pi effort forwarding is currently verified for OpenAI Responses only.
+- Add `/model-roles context-session [prompt|conversation|inherit]`: informed conversation opt-in and immediate prompt-only override without file/session-entry writes. Logical-session UUID + agent-directory policy survives reload/tree/revisit within this process; simultaneous same-key hosts share it. Restart/new/fork uses global; capacity refuses new overrides rather than evicting opt-outs.
+- Add non-content projection category/partial-observation/clipping receipts, separate selector-budget trimming and unknown summary freshness to `/why`, plus approximate on-demand execution-context pressure without changing Pi compaction.
+- Add bounded opt-in paired prompt/context/fixed-baseline evaluation and diverse synthetic fixtures. The credential-free demo is explicitly a harness check, not semantic benchmark evidence. No live evaluation, superiority claim, new automatic-child/mid-task integration or equivalent-pair shortcut is included.
+
 ### Context-aware idle routing and reliable toggles
 
 - Fix enable/disable persistence: pause locally before saving, keep failed toggles paused, and resume enable only after a successful save in the unchanged session. Update only `enabled` against fresh locked disk state, preserving unrelated edits and checking same-value requests too. Role drafts remain revision-checked.

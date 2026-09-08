@@ -68,3 +68,17 @@ test("replace-custom lists deletions but leaves default unless explicitly accept
   assert.equal(result.config.roles.default.model, "inherit");
   assert.ok(result.changes.some((change) => change.id === "legacy" && change.kind === "delete"));
 });
+
+test("all Auto Setup merge choices preserve independent selector profile and global context", () => {
+  for (const mode of ["keep", "replace-selected", "replace-custom"] as const) {
+    const config = {
+      ...defaultConfig(),
+      selector: { model: { provider: "missing", id: "owner/selector" }, effort: "low" as const },
+      selectorContext: "conversation" as const,
+    };
+    const result = mergeProposal(config, proposal(), { mode });
+    assert.deepEqual(result.config.selector, config.selector);
+    assert.notEqual(result.config.selector, config.selector);
+    assert.equal(result.config.selectorContext, "conversation");
+  }
+});

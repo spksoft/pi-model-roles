@@ -1,5 +1,7 @@
 # Is the new pi-model-roles implementation better than OMP?
 
+> Historical comparison: see [current remediation status and evidence](../selector-evaluation.md). Later upgrades mitigate some concerns; semantic superiority, end-to-end cost/quality and host-constrained lifecycle gaps are not claimed solved.
+
 **Independent technical/product assessment — 2026-09-08**
 
 ## Executive answer

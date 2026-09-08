@@ -17,10 +17,16 @@ export interface CustomRole {
   effort: Effort;
   description: string;
 }
+export interface SelectorProfile {
+  model: ModelRef;
+  /** Omitted preserves completion options only when the selector has no required effort pin. */
+  effort?: Effort;
+}
 export interface RoleConfig {
   version: 1;
   enabled: boolean;
   selectorTimeoutMs: number;
+  selector?: SelectorProfile;
   /** Idle-TUI routing data policy; omitted means prompt. Library v1 calls stay prompt-only. */
   selectorContext?: "prompt" | "conversation";
   roles: { default: DefaultRole } & Record<string, DefaultRole | CustomRole>;
@@ -45,6 +51,7 @@ export const REASONS = [
   "selector_failed",
   "selector_timeout",
   "selector_unavailable",
+  "selector_effort_unsupported",
   "input_too_large",
   "insufficient_text",
   "context_budget",
@@ -66,6 +73,7 @@ export interface SelectorUsage {
   cost: number;
 }
 export interface SelectorMetadata {
+  effort?: Effort;
   model: ModelRef;
   durationMs: number;
   usage?: SelectorUsage;
@@ -82,6 +90,8 @@ export interface RoutingMetadata {
   messages: number;
   historyBytes: number;
   truncated: boolean;
+  /** History removed by the selector budget, separate from caller/projection clipping. */
+  budgetRemovedMessages?: number;
 }
 interface DecisionBase {
   routing?: RoutingMetadata;
@@ -114,6 +124,7 @@ export interface SelectionRequest {
   signal?: AbortSignal;
 }
 export interface ClassifierInput {
+  effort?: Effort;
   model: ModelRef;
   systemPrompt: string;
   text: string;
@@ -130,5 +141,9 @@ export interface SelectionDependencies {
   models(): readonly AvailableModel[];
   classify(input: ClassifierInput): Promise<ClassifierOutput>;
   defaultEffort?(model: ModelRef): Effort;
+  /** Optional adapter constraint in addition to cached model effort support. */
+  supportsSelectorEffort?(model: ModelRef, effort: Effort): boolean;
+  /** Explicit scoped pin; requires matching configured effort and positive forwarding support. */
+  requiredSelectorEffort?(model: ModelRef): Effort | undefined;
   now?: () => number;
 }

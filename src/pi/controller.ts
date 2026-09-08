@@ -7,7 +7,8 @@ import {
   selectModelWithContext,
   unavailable,
 } from "../core/selection.js";
-import { projectRoutingContext } from "./routing-context.js";
+import { contextOverride, setContextOverride, type ContextPolicy } from "./context-policy.js";
+import { projectRoutingInput, type ProjectionMetadata } from "./routing-context.js";
 import type {
   Effort,
   ModelRef,
@@ -31,6 +32,7 @@ export class RolesController {
   mode: "auto" | "manual" = "auto";
   role?: string;
   lastDecision?: SelectionDecision;
+  lastProjection?: ProjectionMetadata;
   baseline: ModelState = { effort: "off" };
   private startup: ModelState = { effort: "off" };
   private defaultEffort: (model: ModelRef) => Effort = () => this.baseline.effort;
@@ -61,6 +63,7 @@ export class RolesController {
         : (restored?.mode ?? (!["startup", "new"].includes(reason) ? "manual" : "auto"));
     this.role = restored?.role;
     this.lastDecision = undefined;
+    this.lastProjection = undefined;
     this.pinned = this.mode === "manual" ? actual : undefined;
     await this.reload(ctx);
     this.persist(ctx);
@@ -112,6 +115,22 @@ export class RolesController {
       ? piDependencies(ctx, this.store.snapshot.config, this.defaultEffort)
       : undefined;
   }
+  contextPolicy(ctx: ExtensionContext) {
+    const override = contextOverride(this.agentDir, ctx.sessionManager.getSessionId());
+    const global = this.store.snapshot?.config.selectorContext ?? "prompt";
+    return {
+      global,
+      override: override.policy,
+      effective: override.policy ?? global,
+      revision: override.revision,
+    };
+  }
+  setContextPolicy(ctx: ExtensionContext, policy?: ContextPolicy): boolean {
+    if (!this.active || ctx.sessionManager.getSessionId() !== this.sessionId) return false;
+    if (!setContextOverride(this.agentDir, ctx.sessionManager.getSessionId(), policy)) return false;
+    this.invalidate();
+    return true;
+  }
   private request(ctx: ExtensionContext, task: string, signal?: AbortSignal): SelectionRequest {
     return {
       task,
@@ -156,7 +175,12 @@ export class RolesController {
       `roles:auto-selector=${selector}${this.role ? ` role=${this.role}` : ""} ${displayModel(actual.model)}:${actual.effort}${this.lastDecision?.fallback ? ` [fallback:${this.lastDecision.reason}]` : ""}${this.store.error ? " [config warning]" : ""}`,
     );
   }
-  private record(ctx: ExtensionContext, decision: SelectionDecision): void {
+  private record(
+    ctx: ExtensionContext,
+    decision: SelectionDecision,
+    projection?: ProjectionMetadata,
+  ): void {
+    this.lastProjection = projection;
     this.lastDecision = decision;
     this.role =
       decision.status === "selected" || decision.status === "preserved" ? decision.role : undefined;
@@ -233,12 +257,14 @@ export class RolesController {
     decision: SelectionDecision,
     request: SelectionRequest,
     token: number,
+    policyCurrent: () => boolean = () => true,
   ): Promise<SelectionDecision> {
+    const valid = () => token === this.generation && policyCurrent();
     if (decision.status !== "selected") return decision;
     const session = this.sessionId;
     const dependencies = this.dependencies(ctx);
     if (!dependencies) return unavailable("config_invalid");
-    if (token !== this.generation) return unavailable("stale", true);
+    if (!valid()) return unavailable("stale", true);
     try {
       // Re-evaluate availability at the application boundary, without another classifier call.
       const check = await selectModelForTask(
@@ -246,16 +272,14 @@ export class RolesController {
         dependencies,
       );
       if (check.status !== "preserved") throw new Error("model_unavailable");
-      if (token !== this.generation) return unavailable("stale", true);
+      if (!valid()) return unavailable("stale", true);
       if (
-        !(await this.setPair(
-          ctx,
-          { model: decision.model, effort: decision.effort },
-          () => token === this.generation,
+        !(await this.setPair(ctx, { model: decision.model, effort: decision.effort }, () =>
+          valid(),
         ))
       )
         throw new Error("apply_failed");
-      if (token === this.generation) {
+      if (valid()) {
         const effort = currentState(ctx).effort;
         return {
           ...decision,
@@ -269,7 +293,7 @@ export class RolesController {
         };
       }
     } catch {
-      if (token === this.generation) {
+      if (valid()) {
         // A registry may still advertise a model whose setter just failed. Exclude every
         // failed identity so default -> baseline -> current is finite at application too.
         const failed = new Set([modelKey(decision.model)]);
@@ -277,12 +301,12 @@ export class RolesController {
           ...dependencies,
           models: () => dependencies.models().filter((model) => !failed.has(modelKey(model.ref))),
         };
-        for (let attempt = 0; attempt < 3 && token === this.generation; attempt++) {
+        for (let attempt = 0; attempt < 3 && valid(); attempt++) {
           const fallback = fallbackDecision(request, remaining, "apply_failed");
           if (fallback.status !== "selected") break;
           try {
-            if (await this.setPair(ctx, fallback, () => token === this.generation)) {
-              if (token === this.generation)
+            if (await this.setPair(ctx, fallback, () => valid())) {
+              if (valid())
                 return {
                   ...fallback,
                   effort: currentState(ctx).effort,
@@ -295,7 +319,7 @@ export class RolesController {
           }
           failed.add(modelKey(fallback.model));
         }
-        if (token === this.generation) return unavailable("apply_failed");
+        if (valid()) return unavailable("apply_failed");
       }
     }
     // Pi setModel has no cancellation/CAS API. Repair an intervening manual choice after its await.
@@ -378,16 +402,20 @@ export class RolesController {
       const request = this.request(ctx, event.text, controller.signal);
       request.requiresImages ||= Boolean(event.images?.length);
       const snapshot = this.store.snapshot;
+      const policy = this.contextPolicy(ctx);
+      const policyCurrent = () => this.contextPolicy(ctx).revision === policy.revision;
       const leaf = ctx.sessionManager.getLeafId();
       const manyRoles = Object.keys(snapshot.config.roles).length > 1;
-      const context =
-        useConversation && manyRoles && snapshot.config.selectorContext === "conversation"
-          ? projectRoutingContext(ctx.sessionManager.buildContextEntries(), this.role)
+      const projection =
+        useConversation && manyRoles && policy.effective === "conversation"
+          ? projectRoutingInput(ctx.sessionManager.buildContextEntries(), this.role)
           : undefined;
+      const context = projection?.context;
       const work = () => this.select(ctx, request, context);
       let decision = manyRoles ? await withSelectionLoader(ctx, controller, work) : await work();
       if (
         token !== this.generation ||
+        !policyCurrent() ||
         controller.signal.aborted ||
         !ctx.isIdle() ||
         snapshot.revision !== this.store.snapshot?.revision ||
@@ -395,7 +423,7 @@ export class RolesController {
       )
         decision = unavailable("cancelled", true);
       if (decision.status !== "cancelled")
-        decision = await this.apply(ctx, decision, request, token);
+        decision = await this.apply(ctx, decision, request, token, policyCurrent);
       if (decision.status === "cancelled") {
         if (
           this.active &&
@@ -411,7 +439,7 @@ export class RolesController {
         }
         return { action: "handled" };
       }
-      this.record(ctx, decision);
+      this.record(ctx, decision, projection?.receipt);
       return { action: "continue" };
     } catch {
       ctx.ui.notify("Model roles: routing failed; keeping Pi's current model.", "warning");

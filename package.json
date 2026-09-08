@@ -14,6 +14,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./evaluation": {
+      "types": "./dist/evaluation/index.d.ts",
+      "import": "./dist/evaluation/index.js"
+    },
+    "./evaluation/fixtures": {
+      "types": "./dist/evaluation/fixtures.d.ts",
+      "import": "./dist/evaluation/fixtures.js"
     }
   },
   "pi": {
@@ -29,7 +37,9 @@
     "CHANGELOG.md",
     "docs/api.md",
     "docs/configuration.md",
-    "docs/compatibility.md"
+    "docs/compatibility.md",
+    "docs/selector-evaluation.md",
+    "docs/architecture.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -39,7 +49,8 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run test:integration"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run test:integration",
+    "evaluate:demo": "node --import tsx examples/evaluate-routing.ts"
   },
   "dependencies": {
     "yaml": "2.9.0"

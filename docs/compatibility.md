@@ -89,8 +89,8 @@ Start with the footer's `auto-selector=enabled|disabled` indicator and `/model-r
 | A task used default instead of a custom role | Inspect `/model-roles why` for `no_match`, `ambiguous`, unavailable-role warnings, or selector failure. Make descriptions distinct. For follow-ups such as “implement that”, consider opt-in `/model-roles context conversation`; incomplete history still falls back. |
 | Enable/disable cannot save | The warning now names the error category and distinguishes local pause from global persistence. Disable remains locally effective after failure; failed enable leaves routing paused. Fix the reported cause before retrying. |
 | A save says it committed but UI refresh failed | Reload and inspect saved state; do not blindly retry the write. |
-| History inclusion is unwanted | Run `/model-roles context prompt`; reload other sessions. Already transmitted requests cannot be undone. |
-| Selection is slow or times out | Custom roles add one request to the default model. Adjust `selectorTimeoutMs` within its documented bounds if appropriate. Disabling Auto Selector or removing custom roles avoids that extra request. |
+| History inclusion is unwanted | Run `/model-roles context-session prompt` for this logical session/process without saving, or `/model-roles context prompt` for the global default and reload other sessions. Explicit session overrides may mask global changes. Already transmitted requests cannot be undone. |
+| Selection is slow or times out | Custom roles add one request to the independent selector profile or default model. Adjust `selectorTimeoutMs` within its documented bounds if appropriate. Disabling Auto Selector or removing custom roles avoids that extra request. |
 | Saved roles do not appear in another session | Run Pi's `/reload` there. Configuration has no background watcher. |
 | Role model or effort is unavailable | Configure the provider in Pi or edit the role. The menu shows supported effort levels; older saved values may be clamped with a warning. |
 | Escape restored text but not an image | Selection was cancelled and the task was not run. Reattach the image before submitting again. |
@@ -164,6 +164,20 @@ npm pack --ignore-scripts
 
 For version 0.1.0 this produces `pi-model-roles-0.1.0.tgz`. It includes compiled code, declarations, examples, and the maintained user guides, with no install/postinstall build. Normal users should follow the [GitHub installation guide](../README.md#quick-install).
 
+### Native subagent verification context
+
+Run the native test (and the full `npm run check` gate that includes it) in a normal parent environment, not inside a delegated child:
+
+```sh
+node --import tsx --test test/integration/pi-subagents.test.ts
+```
+
+In **pi-subagents 0.65.1**, the package entry captures `PI_SUBAGENT_CHILD === "1"` at import time and makes its parent extension a no-op in that context. No runtime-agent registration or structured-delegation event owner is installed. The SDK fixture's later parent/child simulation cannot undo that import-time decision. A request without an owner previously reached the example's 30-second `unavailable_or_timed_out` boundary; this was not evidence of a slow native child or a failed model invocation. The native test now fails immediately with a parent-context diagnostic before importing the optional package or changing fixture environment variables. It remains a failing test in the wrong context, not a skip or an accepted unsupported result.
+
+Do not unset child/depth flags, move imports to evade the guard, increase timeouts, or substitute another launcher. Ask the normal parent to run the same command with its environment unchanged. This check only identifies the known import-time constraint; it does not grant launch authority or bypass any depth, permission, or provider checks. Completion, exact model/effort, explicit pins, and parent-isolation assertions remain mandatory.
+
+The installed package's `docs/extension-api.md` specifies synchronous runtime registration after extension setup, no result when no compatible owner handles the request, and an active context for structured delegation. The opt-in example already warns if registration is unavailable; its command will not launch without a registration. Direct API callers must likewise use a ready owner in a supported context. No supported-parent runtime defect or need for an upstream patch was established by the child-only timeout.
+
 ### What automated checks cover
 
 Tests use synthetic data, fake providers, and disposable agent directories—not credentials or live provider access. Dependency installation may need the network. The packed smoke test uses npm's offline cache populated by `npm ci`; a missing cache requires dependency provisioning.
@@ -190,3 +204,11 @@ The packaging smoke test validates a **locally built tarball**, not a live GitHu
 **Human visual terminal acceptance is not yet claimed.** Automated dialogs/loaders test state and cancellation but do not prove keyboard/IME behavior, physical resizing, narrow terminals, or all themes.
 
 Use the [manual TUI checklist](https://github.com/spksoft/pi-model-roles/blob/main/test/manual/tui-checklist.md) and record the actual environment and results. Do not describe the in-flight model-switch limitation as solved by those checks. The original files under `docs/plan/` are historical design records, not current installation or compatibility guidance.
+
+## Selector upgrade boundaries
+
+Independent selector model selection uses the cached registry and exact scope. Explicit selector effort forwarding is verified only through Pi 0.85.1's OpenAI Responses API-specific completion options (including off and model thinking maps); other APIs require effort omission on unpinned selectors. Scoped thinking pins require matching explicit, verified selector effort. The identifiable configured-provider `streamSimple` override path refuses explicit effort because it can discard/overwrite API-specific options; its unpinned model-only profiles remain supported. Unsupported explicit effort is a safe execution-fallback diagnostic, not permission to choose a new provider. Real fake-transport tests establish serialization/auth/signal behavior, not live provider compliance, prices or quality. Custom implementations can still depart from the public API semantics.
+
+Session privacy overrides are shared by logical UUID + agent directory in one process, **not isolated per SDK host**. Real SDK tests cover reload, tree, session replacement/revisit and new/fork inheritance; other processes/restarts use global policy. Their runtime-only lifetime and capacity refusal are described in [configuration](configuration.md#logical-session-context-override-process-only). No compaction, final-payload inspection, background child routing, mid-task routing, or atomic cancellation of in-flight Pi `setModel` has been added.
+
+`npm run evaluate:demo` is a credential-free harness/contract check. Live semantic advantage, end-to-end execution quality/cost and human TUI acceptance remain **unmeasured/not run**; see the [remediation and future-evidence checklist](selector-evaluation.md).

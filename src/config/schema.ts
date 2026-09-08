@@ -1,6 +1,6 @@
 import { LIMITS, RESERVED_IDS, ROLE_ID, charLength } from "../core/defaults.js";
 import { isEffort, isModelRef, isRecord } from "../core/model-identity.js";
-import type { CustomRole, DefaultRole, RoleConfig } from "../core/types.js";
+import type { CustomRole, DefaultRole, RoleConfig, SelectorProfile } from "../core/types.js";
 export class ConfigError extends Error {
   constructor(
     public readonly code: string,
@@ -38,7 +38,11 @@ function role(value: unknown, isDefault: boolean, field: string): DefaultRole | 
 }
 export function validateConfig(value: unknown): RoleConfig {
   if (!isRecord(value)) throw new ConfigError("expected_object");
-  keys(value, ["version", "enabled", "selectorTimeoutMs", "selectorContext", "roles"], "config");
+  keys(
+    value,
+    ["version", "enabled", "selectorTimeoutMs", "selectorContext", "selector", "roles"],
+    "config",
+  );
   if (
     value.selectorContext !== undefined &&
     value.selectorContext !== "prompt" &&
@@ -66,7 +70,20 @@ export function validateConfig(value: unknown): RoleConfig {
       throw new ConfigError("invalid_role_id", "roles");
     if (id !== "default") roles[id] = role(value.roles[id], false, `roles.${id}`);
   }
+  let selector: SelectorProfile | undefined;
+  if (value.selector !== undefined) {
+    if (!isRecord(value.selector)) throw new ConfigError("invalid_selector", "selector");
+    keys(value.selector, ["model", "effort"], "selector");
+    if (!isModelRef(value.selector.model)) throw new ConfigError("invalid_model", "selector.model");
+    if (value.selector.effort !== undefined && !isEffort(value.selector.effort))
+      throw new ConfigError("invalid_effort", "selector.effort");
+    selector = {
+      model: { ...value.selector.model },
+      ...(value.selector.effort === undefined ? {} : { effort: value.selector.effort }),
+    };
+  }
   return {
+    ...(selector ? { selector } : {}),
     version: 1,
     enabled: value.enabled ?? true,
     selectorTimeoutMs: timeout,
@@ -80,6 +97,10 @@ export function freezeConfig(config: RoleConfig): RoleConfig {
   for (const value of Object.values(config.roles)) {
     if (value.model !== "inherit") Object.freeze(value.model);
     Object.freeze(value);
+  }
+  if (config.selector) {
+    Object.freeze(config.selector.model);
+    Object.freeze(config.selector);
   }
   Object.freeze(config.roles);
   return Object.freeze(config);

@@ -66,10 +66,46 @@ export function availableModels(ctx: ExtensionContext): AvailableModel[] {
     )
     .map((model) => ({
       ref: { provider: model.provider, id: model.id },
-      efforts: getSupportedThinkingLevels(model),
+      efforts: (() => {
+        const pin = ctx.scopedModels.find((item) => sameModel(item.model, model))?.thinkingLevel;
+        const supported = getSupportedThinkingLevels(model);
+        return pin === undefined ? supported : supported.filter((effort) => effort === pin);
+      })(),
       images: model.input.includes("image"),
       contextWindow: model.contextWindow,
     }));
+}
+export function requiredSelectorEffort(ctx: ExtensionContext, ref: ModelRef): Effort | undefined {
+  return ctx.scopedModels.find((item) => sameModel(item.model, ref))?.thinkingLevel;
+}
+
+export function selectorEffortAllowed(
+  ctx: ExtensionContext,
+  ref: ModelRef,
+  effort: Effort | undefined,
+): boolean {
+  const required = requiredSelectorEffort(ctx, ref);
+  return (
+    (required === undefined || effort === required) &&
+    (effort === undefined || selectorEfforts(ctx, ref).includes(effort))
+  );
+}
+
+/** Pi 0.85.1 complete() accepts API-specific options, not simple-stream reasoning.
+ * Only OpenAI Responses forwarding is verified here; other APIs may omit effort. */
+export function selectorEfforts(ctx: ExtensionContext, ref: ModelRef): readonly Effort[] {
+  const model = ctx.modelRegistry.find(ref.provider, ref.id);
+  const configured = ctx.modelRegistry.getRegisteredProviderConfig(ref.provider);
+  // Configured streamSimple replaces complete() transport and can overwrite reasoningEffort.
+  return model?.api === "openai-responses" &&
+    !(configured?.streamSimple && configured.api === model.api) &&
+    !Object.hasOwn(model.samplingParams ?? {}, "reasoning")
+    ? (availableModels(ctx)
+        .find((item) => sameModel(item.ref, ref))
+        ?.efforts.filter(
+          (effort) => effort !== "off" || !model.reasoning || model.provider !== "github-copilot",
+        ) ?? [])
+    : [];
 }
 export async function completeClassifier(
   ctx: ExtensionContext,
@@ -77,6 +113,8 @@ export async function completeClassifier(
 ): Promise<ClassifierOutput> {
   const model = ctx.modelRegistry.find(input.model.provider, input.model.id);
   if (!model) throw new Error("selector_unavailable");
+  if (!selectorEffortAllowed(ctx, input.model, input.effort))
+    throw new Error("selector_effort_unsupported");
   const response = await ctx.modelRegistry.complete(
     model,
     {
@@ -85,7 +123,13 @@ export async function completeClassifier(
         { role: "user", content: [{ type: "text", text: input.text }], timestamp: Date.now() },
       ],
     },
-    { signal: input.signal, maxTokens: input.maxTokens },
+    {
+      signal: input.signal,
+      maxTokens: input.maxTokens,
+      ...(input.effort === undefined || input.effort === "off"
+        ? {}
+        : { reasoningEffort: input.effort }),
+    },
   );
   if (
     response.stopReason !== "stop" ||
@@ -121,6 +165,8 @@ export function piDependencies(
     models: () => availableModels(ctx),
     classify: (input) => completeClassifier(ctx, input),
     defaultEffort: effort,
+    supportsSelectorEffort: (ref, level) => selectorEfforts(ctx, ref).includes(level),
+    requiredSelectorEffort: (ref) => requiredSelectorEffort(ctx, ref),
   };
 }
 export function currentState(ctx: ExtensionContext): ModelState {

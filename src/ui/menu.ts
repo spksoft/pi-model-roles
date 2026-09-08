@@ -14,7 +14,12 @@ import {
 } from "./config-save.js";
 import { showRoleDashboard } from "./role-dashboard.js";
 import { selectModel } from "./model-picker.js";
-import { configureRoutingContext, explainRouting } from "./routing-settings.js";
+import { configureSelector } from "./selector-settings.js";
+import {
+  configureRoutingContext,
+  configureSessionContext,
+  explainRouting,
+} from "./routing-settings.js";
 
 export function roleSummary(id: string, role: DefaultRole): string {
   return `${id} · ${role.model === "inherit" ? "Pi default" : displayModel(role.model)} · ${role.effort}`;
@@ -102,7 +107,7 @@ async function editRole(
     ))
   )
     return;
-  if (!(await confirmFirstCustomRoleRouting(ctx, snapshot.config, draft))) return;
+  if (!(await confirmFirstCustomRoleRouting(ctx, snapshot.config, draft, controller))) return;
   await saveRoleConfig(controller, ctx, draft, snapshot.revision);
 }
 
@@ -247,10 +252,13 @@ export async function handleCommand(
   else if (action === "use" && parts[1] && !parts[2]) await controller.use(ctx, parts[1]);
   else if (action === "context" && !parts[2])
     await configureRoutingContext(controller, ctx, parts[1]);
+  else if (action === "context-session" && !parts[2])
+    await configureSessionContext(controller, ctx, parts[1]);
+  else if (action === "selector" && !parts[1]) await configureSelector(controller, ctx);
   else if (action === "why" && !parts[1]) explainRouting(controller, ctx);
   else
     ctx.ui.notify(
-      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, /model-roles context [prompt|conversation], /model-roles why, or /model-roles run /command [arguments].",
+      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, /model-roles context [prompt|conversation], /model-roles context-session [prompt|conversation|inherit], /model-roles selector, /model-roles why, or /model-roles run /command [arguments].",
       "info",
     );
 }

@@ -26,7 +26,7 @@ Restart Pi or run `/reload`.
 
 Auto Setup compares candidates with your existing roles and settings. It aims for a small, distinct role set and justified reasoning effort, not one role per model or maximum effort everywhere. Without stated priorities, its guidance favors a conservative balance of reliability, latency, and cost; recommendations are not measured guarantees. See [how recommendations are designed](docs/configuration.md#how-auto-setup-designs-recommendations).
 
-Auto Setup uses the current Pi agent and any tools you already enabled; it does not switch your active model or apply changes without confirmation. With only the inherited `default` role, Pi makes no extra selection request. When custom roles exist, the default model classifies eligible new prompts: one clear match uses that role; no match or overlapping matches use `default`.
+Auto Setup uses the current Pi agent and any tools you already enabled; it does not switch your active model or apply changes without confirmation. With only the inherited `default` role, Pi makes no extra selection request. When custom roles exist, the default model (or your optional independent selector profile) classifies eligible new prompts: one clear match uses that role; no match or overlapping matches use `default`.
 
 ### Everyday commands
 
@@ -40,6 +40,8 @@ Run these inside Pi:
 | `/model-roles enable` | Allow the next eligible prompt to be selected automatically. |
 | `/model-roles run /command [arguments]` | Select a model, then invoke a registered command while idle; respects manual/disabled routing. |
 | `/model-roles context [prompt\|conversation]` | Choose prompt-only or opt-in bounded conversation context. |
+| `/model-roles selector` | Choose/reset an independent selector model and optional effort, with provider/cost disclosure. |
+| `/model-roles context-session [prompt\|conversation\|inherit]` | Override sharing for this session in this process only; no file save. |
 | `/model-roles why` | Explain the last selection without displaying private task/history text. |
 
 Manual model or reasoning-effort changes also pause automatic selection. Your Pi defaults are never rewritten. Disable pauses this session even if saving fails; enable resumes only after the global toggle is saved successfully.
@@ -65,6 +67,8 @@ For extension-owned commands that skip automatic routing, use the explicit wrapp
 ```
 
 The target command must already be installed. The wrapper routes from its name and arguments, then invokes the original command unchanged—no changes to Pi or the command's package are needed. It selects the **parent session model**, not any subagent models. Run `/model-roles enable` first if selection is paused. See [command routing, privacy, and recovery](docs/compatibility.md#run-an-extension-owned-command).
+
+The optional native subagent example and its integration test require a normal parent process, not a subagent child. See [native verification context](docs/compatibility.md#native-subagent-verification-context); never clear inherited safety flags to run it.
 
 ## Manual role setup
 
@@ -94,7 +98,9 @@ Use Settings instead of editing YAML unless you need the detailed options in the
 
 ## Cost and privacy
 
-Custom roles can add one selector request before an eligible idle TUI submission, including `/model-roles run`. By default it receives submitted task text and role descriptions only. Opt-in conversation mode also sends bounded recent dialogue and existing summaries to the default selector provider, which may differ from the execution provider. Raw thinking, tool calls/results, and images are excluded, but dialogue/summaries can still contain sensitive copied content or unmarked template expansions: this is not a secret detector. No extra summarizer or repository scan is added. The selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See [cost and privacy safeguards](docs/configuration.md#advanced-limits-and-safeguards).
+Custom roles can add one selector request before an eligible idle TUI submission, including `/model-roles run`. By default it receives submitted task text and role descriptions only. Opt-in conversation mode also sends bounded recent dialogue and existing summaries to the configured selector provider (default-role provider unless overridden), which may differ from the execution provider. Raw thinking, tool calls/results, and images are excluded, but dialogue/summaries can still contain sensitive copied content or unmarked template expansions: this is not a secret detector. No extra summarizer or repository scan is added. The selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See [cost and privacy safeguards](docs/configuration.md#advanced-limits-and-safeguards).
+
+Selector improvements and their remaining limits are tracked in [selector evidence and evaluation](docs/selector-evaluation.md). The credential-free demo is a harness check, not evidence of semantic superiority.
 
 ## Detailed guides
 

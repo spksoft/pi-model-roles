@@ -221,9 +221,10 @@ async function autoSelect(
   const candidates = ids.filter((id) =>
     eligible(request, deps, roleState(id, request, deps)?.model),
   );
+  let budgetRemovedMessages = 0;
   const finish = (result: SelectionDecision): SelectionDecision => {
     if (candidates.length < ids.length) result.warnings.push("roles_unavailable");
-    if (context) result.routing = routingMetadata(context);
+    if (context) result.routing = { ...routingMetadata(context), budgetRemovedMessages };
     return result;
   };
   if (!candidates.length) return finish(fallbackDecision(request, deps, "default_only", false));
@@ -234,9 +235,20 @@ async function autoSelect(
   const selector = eligible(
     { ...request, requiresImages: false },
     deps,
-    roleState("default", request, deps)?.model,
+    deps.config.selector?.model ?? roleState("default", request, deps)?.model,
   );
   if (!selector) return finish(fallbackDecision(request, deps, "selector_unavailable"));
+  const effort = deps.config.selector?.effort;
+  const requiredEffort = deps.requiredSelectorEffort?.(selector.ref);
+  if (
+    (requiredEffort !== undefined &&
+      (effort !== requiredEffort ||
+        deps.supportsSelectorEffort?.(selector.ref, requiredEffort) !== true)) ||
+    (effort !== undefined &&
+      (!selector.efforts.includes(effort) ||
+        deps.supportsSelectorEffort?.(selector.ref, effort) === false))
+  )
+    return finish(fallbackDecision(request, deps, "selector_effort_unsupported"));
   if (context && !continuationDecision(request, deps, context)) delete context.previousRole;
   const systemPrompt = context ? CONTEXT_CLASSIFIER_PROMPT : CLASSIFIER_PROMPT;
   let text = classifierText(request.task, deps.config.roles, candidates, context);
@@ -245,19 +257,25 @@ async function autoSelect(
     Buffer.byteLength(text + systemPrompt) + LIMITS.outputTokens + 1024 <= selector.contextWindow;
   while (!fits() && context?.messages.length) {
     context.messages.shift();
+    budgetRemovedMessages++;
     context.truncated = true;
     if (!context.messages.length) delete context.previousRole;
     text = classifierText(request.task, deps.config.roles, candidates, context);
   }
   if (!fits()) return finish(fallbackDecision(request, deps, "context_budget"));
   const start = (deps.now ?? Date.now)();
-  let metadata: SelectorMetadata = { model: { ...selector.ref }, durationMs: 0 };
+  let metadata: SelectorMetadata = {
+    model: { ...selector.ref },
+    durationMs: 0,
+    ...(effort === undefined ? {} : { effort }),
+  };
   let result: SelectionDecision;
   try {
     const response = await bounded(
       (signal) =>
         deps.classify({
           model: selector.ref,
+          ...(effort === undefined ? {} : { effort }),
           systemPrompt,
           text,
           signal,
