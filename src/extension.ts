@@ -22,7 +22,6 @@ export function modelRoleCommandCompletions(
     { value: "run", label: "Run command with model routing" },
     { value: "context", label: "Choose selector context (with consent)" },
     { value: "selector", label: "Choose independent selector profile" },
-    { value: "context-session", label: "Session context override (process only)" },
     { value: "why", label: "Explain the last selection" },
   ].filter((item) => item.value.startsWith(prefix));
 }

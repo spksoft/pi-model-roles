@@ -21,6 +21,7 @@ export function defaultConfig(): RoleConfig {
     version: 1,
     enabled: true,
     selectorTimeoutMs: 8000,
+    selectorContext: "conversation",
     roles: { default: { model: "inherit", effort: "inherit" } },
   };
 }

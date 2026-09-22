@@ -26,6 +26,29 @@ function selectorData(context: { messages: unknown[] }): Record<string, unknown>
   return JSON.parse(message.content[0]!.text);
 }
 
+test("new configuration sends bounded conversation to the selector when roles are added", async () => {
+  const h = await sdkHarness();
+  try {
+    h.respond(fauxAssistantMessage("Earlier synthetic answer."));
+    await h.session.prompt("Earlier synthetic request.");
+    const store = new ConfigStore(h.dir);
+    const snapshot = await store.load();
+    assert.ok(snapshot);
+    assert.equal(snapshot.config.selectorContext, "conversation");
+    await store.save({ ...snapshot.config, roles: config().roles }, snapshot.revision);
+    await h.session.reload();
+    h.respond((context) => {
+      assert.match(JSON.stringify(selectorData(context).context), /Earlier synthetic request/);
+      return fauxAssistantMessage('{"action":"classify","matches":["fast"]}');
+    }, fauxAssistantMessage("Synthetic task answer."));
+    await h.session.prompt("Apply the short change.");
+    assert.equal(h.session.model?.id, "owner/fast");
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.close();
+  }
+});
+
 test("real idle input supplies retained dialogue, continues the same role, and permits new task reclassification", async () => {
   const h = await sdkHarness();
   try {
@@ -198,9 +221,9 @@ test("failed context save preserves prior policy and manual pause without disclo
     });
     await h.session.prompt("/model-roles context conversation");
     assert.equal(await readFile(store.path, "utf8"), before);
-    assert.equal((await store.load())?.config.selectorContext, undefined);
+    assert.equal((await store.load())?.config.selectorContext, "conversation");
     await h.session.prompt("/model-roles why");
-    assert.match(h.ui.notifications.at(-1) ?? "", /configured context: prompt/);
+    assert.match(h.ui.notifications.at(-1) ?? "", /configured context: conversation/);
     assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=disabled/);
     assert.equal(h.faux.state.callCount, 0);
     assert.deepEqual(h.errors, []);

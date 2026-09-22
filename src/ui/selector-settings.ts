@@ -63,15 +63,15 @@ export async function configureSelector(
     (draft.roles.default.model === "inherit"
       ? controller.baseline.model
       : draft.roles.default.model);
-  const policy = controller.contextPolicy(ctx);
+  const contextMode = snapshot.config.selectorContext ?? "prompt";
   if (
     !(await ctx.ui.confirm(
       action === "reset" ? "Reset independent selector?" : "Save independent selector?",
-      `Selector provider/model: ${displayModel(ref)}; effort: ${draft.selector?.effort ?? "adapter default (no explicit option)"}. Effective idle-input context: ${policy.effective}; global: ${policy.global}; session override: ${policy.override ?? "inherit"}. Each eligible task may add one request, cost and latency. Task text and role descriptions are sent; conversation mode also sends bounded retained visible dialogue/summaries, while full mode sends up to 100,000 UTF-8 bytes including raw retained tool calls/results. Neither mode secret-filters text; full mode excludes raw thinking, images, custom entries/messages, and !! shell commands. The provider may differ from execution. Failure uses normal execution fallback, never a second selector provider. This user-wide profile is saved to role YAML; other sessions need reload. Auto Setup preserves it. Execution defaults/current model and effort are unchanged.`,
+      `Selector provider/model: ${displayModel(ref)}; effort: ${draft.selector?.effort ?? "adapter default (no explicit option)"}. Idle-input context: ${contextMode}. Each eligible task may add one request, cost and latency. Task text and role descriptions are sent; conversation mode also sends bounded retained visible dialogue/summaries, while full mode sends up to 100,000 UTF-8 bytes including raw retained tool calls/results. Neither mode secret-filters text; full mode excludes raw thinking, images, custom entries/messages, and !! shell commands. The provider may differ from execution. Failure uses normal execution fallback, never a second selector provider. This user-wide profile is saved to role YAML; other sessions need reload. Auto Setup preserves it. Execution defaults/current model and effort are unchanged.`,
     ))
   )
     return;
-  if (!current() || controller.contextPolicy(ctx).revision !== policy.revision) return;
+  if (!current()) return;
   if (
     ref &&
     (!availableModels(ctx).some((item) => sameModel(item.ref, ref)) ||

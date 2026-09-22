@@ -54,7 +54,7 @@ test("published configuration examples parse and API documents every reason", as
   assert.doesNotMatch(api, /await bridge\.spawn/);
 });
 
-test("first-role consent describes the supported task-only routing and preserves rejection", async () => {
+test("first-role consent discloses new conversation default and legacy prompt-only routing", async () => {
   let disclosure = "";
   const ctx = {
     ui: {
@@ -64,11 +64,26 @@ test("first-role consent describes the supported task-only routing and preserves
       },
     },
   } as unknown as ExtensionContext;
-  assert.equal(await confirmFirstCustomRoleRouting(ctx, defaultConfig(), config()), false);
+  assert.equal(
+    await confirmFirstCustomRoleRouting(ctx, defaultConfig(), {
+      ...config(),
+      selectorContext: "conversation",
+    }),
+    false,
+  );
   assert.match(disclosure, /idle TUI submission/);
   assert.match(disclosure, /submitted task text and role descriptions/);
   assert.match(disclosure, /explicit \/model-roles run command/);
-  assert.match(disclosure, /not automatically collected/);
+  assert.match(disclosure, /conversation mode also sends bounded retained user\/assistant text/);
   assert.match(disclosure, /not secret-filtered/);
   assert.match(disclosure, /Auto Setup are not independently rerouted/);
+  assert.equal(
+    await confirmFirstCustomRoleRouting(
+      ctx,
+      { ...defaultConfig(), selectorContext: undefined },
+      { ...config(), selectorContext: undefined },
+    ),
+    false,
+  );
+  assert.match(disclosure, /not automatically collected/);
 });

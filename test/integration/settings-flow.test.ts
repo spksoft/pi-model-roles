@@ -16,14 +16,72 @@ const draft = [
 test("removed model-roles subcommands show the bounded command surface", async () => {
   const h = await sdkHarness();
   try {
-    for (const command of ["status", "reload", "pause", "auto", "auto-setup"]) {
+    for (const command of ["status", "reload", "pause", "auto", "auto-setup", "context-session"]) {
       await h.session.prompt(`/model-roles ${command}`);
     }
     assert.equal(h.faux.state.callCount, 0);
     assert.equal(
       h.ui.notifications.filter((message) => message.includes("/model-roles settings")).length,
-      5,
+      6,
     );
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.close();
+  }
+});
+
+test("root command opens every command family and dispatches selected submenus", async () => {
+  const launched: string[] = [];
+  const h = await sdkHarness({
+    extensions: [
+      (pi) => {
+        pi.registerCommand("synthetic-target", {
+          description: "Fixture",
+          handler: async () => {
+            launched.push("run");
+          },
+        });
+      },
+    ],
+  });
+  try {
+    h.ui.answers.push("/model-roles settings");
+    h.ui.customAnswers.push({ type: "close" });
+    await h.session.prompt("/model-roles");
+    const options = h.ui.selections.at(-1)?.options ?? [];
+    for (const command of [
+      "settings",
+      "disable",
+      "use default",
+      "run",
+      "context",
+      "selector",
+      "why",
+    ])
+      assert.ok(options.includes(`/model-roles ${command}`), command);
+    assert.ok(!options.some((option) => option.includes("context-session")));
+    await h.session.prompt("/model-roles"); // Escape/cancel: no action.
+    assert.equal(h.faux.state.callCount, 0);
+
+    h.ui.answers.push("/model-roles disable");
+    await h.session.prompt("/model-roles");
+    assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=disabled/);
+    h.ui.answers.push("/model-roles enable");
+    await h.session.prompt("/model-roles");
+    h.ui.answers.push("/model-roles use default");
+    await h.session.prompt("/model-roles");
+    h.ui.answers.push("/model-roles run", "/synthetic-target");
+    await h.session.prompt("/model-roles");
+    assert.deepEqual(launched, ["run"]);
+    h.ui.answers.push("/model-roles context", "prompt");
+    await h.session.prompt("/model-roles");
+    assert.equal((await new ConfigStore(h.dir).load())?.config.selectorContext, "prompt");
+    h.ui.answers.push("/model-roles selector");
+    await h.session.prompt("/model-roles");
+    assert.ok(h.ui.selections.some((row) => row.options.includes("reset")));
+    h.ui.answers.push("/model-roles why");
+    await h.session.prompt("/model-roles");
+    assert.match(h.ui.notifications.at(-1) ?? "", /Auto Selector:/);
     assert.deepEqual(h.errors, []);
   } finally {
     await h.close();
@@ -41,7 +99,7 @@ test("native menu: cancelling every add step leaves configuration and model unto
       h.ui.customAnswers.push({ type: "close" });
       h.ui.answers.push(...draft.slice(0, step).filter((_value, index) => index !== 2));
       if (step !== 2) h.ui.answers.push(undefined);
-      await h.session.prompt("/model-roles");
+      await h.session.prompt("/model-roles settings");
       assert.equal(await readFile(store.path, "utf8"), before, `cancel step ${step}`);
       assert.equal(h.session.model?.id, "default");
       assert.equal(h.faux.state.callCount, 0);
@@ -58,7 +116,7 @@ test("native menu: create, edit, delete, override default, and command-level rol
     const store = new ConfigStore(h.dir);
     h.ui.customAnswers.push({ type: "add" }, { keys: [draft[2], "\r"] }, { type: "close" });
     h.ui.answers.push(...draft.filter((_value, index) => index !== 2));
-    await h.session.prompt("/model-roles");
+    await h.session.prompt("/model-roles settings");
     let snap = await store.load();
     assert.ok(snap);
     assert.deepEqual(Object.keys(snap.config.roles), ["default", "fast"]);
@@ -71,7 +129,7 @@ test("native menu: create, edit, delete, override default, and command-level rol
       { keys: ["fixture/owner/fast", "\r"] },
       { type: "close" },
     );
-    await h.session.prompt("/model-roles");
+    await h.session.prompt("/model-roles settings");
     snap = await store.load();
     assert.ok(snap);
     assert.equal(snap.config.roles.fast?.effort, "medium");
@@ -87,7 +145,7 @@ test("native menu: create, edit, delete, override default, and command-level rol
     assert.ok(changed);
     h.ui.customAnswers.push({ type: "delete", id: "fast" }, { type: "close" });
     h.ui.answers.push(true);
-    await h.session.prompt("/model-roles");
+    await h.session.prompt("/model-roles settings");
     snap = await store.load();
     assert.ok(snap);
     assert.deepEqual(Object.keys(snap.config.roles), ["default"]);
@@ -97,7 +155,7 @@ test("native menu: create, edit, delete, override default, and command-level rol
       { type: "close" },
     );
     h.ui.answers.push("high", true);
-    await h.session.prompt("/model-roles");
+    await h.session.prompt("/model-roles settings");
     snap = await store.load();
     assert.ok(snap);
     assert.equal(snap.config.roles.default.effort, "high");
@@ -243,11 +301,11 @@ test("native menu: invalid identifiers and descriptions never create drafts", as
     for (const id of ["default", "constructor", "__proto__", "Bad name", "x".repeat(49)]) {
       h.ui.customAnswers.push({ type: "add" }, { type: "close" });
       h.ui.answers.push(id);
-      await h.session.prompt("/model-roles");
+      await h.session.prompt("/model-roles settings");
     }
     h.ui.customAnswers.push({ type: "add" }, { type: "close" });
     h.ui.answers.push("fast", "  ");
-    await h.session.prompt("/model-roles");
+    await h.session.prompt("/model-roles settings");
     assert.equal(await readFile(store.path, "utf8"), before);
   } finally {
     await h.close();

@@ -15,11 +15,7 @@ import {
 import { showRoleDashboard } from "./role-dashboard.js";
 import { selectModel } from "./model-picker.js";
 import { configureSelector } from "./selector-settings.js";
-import {
-  configureRoutingContext,
-  configureSessionContext,
-  explainRouting,
-} from "./routing-settings.js";
+import { configureRoutingContext, explainRouting } from "./routing-settings.js";
 
 export function roleSummary(id: string, role: DefaultRole): string {
   return `${id} · ${role.model === "inherit" ? "Pi default" : displayModel(role.model)} · ${role.effort}`;
@@ -246,19 +242,37 @@ export async function handleCommand(
   await ctx.waitForIdle();
   const parts = args.trim().split(/\s+/);
   const action = parts[0];
-  if (!action || (action === "settings" && !parts[1])) await showMenu(controller, setup, ctx);
+  if (!action) {
+    const current = controller.captureGuard(ctx);
+    const options = [
+      "/model-roles settings",
+      `/model-roles ${controller.autoSelectorEnabled ? "disable" : "enable"}`,
+      ...Object.keys(controller.store.snapshot?.config.roles ?? {}).map(
+        (id) => `/model-roles use ${id}`,
+      ),
+      "/model-roles run",
+      "/model-roles context",
+      "/model-roles selector",
+      "/model-roles why",
+    ];
+    const choice = await ctx.ui.select("Model roles — choose command", options);
+    if (!choice || !current() || !options.includes(choice)) return;
+    const selected = choice.slice("/model-roles ".length);
+    if (selected === "run") {
+      const command = await ctx.ui.input("Run command with model routing", "/command [arguments]");
+      if (command && current()) await controller.runCommand(ctx, command);
+    } else await handleCommand(controller, setup, selected, ctx);
+  } else if (action === "settings" && !parts[1]) await showMenu(controller, setup, ctx);
   else if (action === "enable" && !parts[1]) await setAutoSelector(controller, ctx, true);
   else if (action === "disable" && !parts[1]) await setAutoSelector(controller, ctx, false);
   else if (action === "use" && parts[1] && !parts[2]) await controller.use(ctx, parts[1]);
   else if (action === "context" && !parts[2])
     await configureRoutingContext(controller, ctx, parts[1]);
-  else if (action === "context-session" && !parts[2])
-    await configureSessionContext(controller, ctx, parts[1]);
   else if (action === "selector" && !parts[1]) await configureSelector(controller, ctx);
   else if (action === "why" && !parts[1]) explainRouting(controller, ctx);
   else
     ctx.ui.notify(
-      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, /model-roles context [prompt|conversation|full], /model-roles context-session [prompt|conversation|full|inherit], /model-roles selector, /model-roles why, or /model-roles run /command [arguments].",
+      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, /model-roles context [prompt|conversation|full], /model-roles selector, /model-roles why, or /model-roles run /command [arguments].",
       "info",
     );
 }

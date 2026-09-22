@@ -14,9 +14,14 @@ test("YAML round-trips default and multiline Unicode criteria", () => {
   assert.deepEqual(parseConfig(serializeConfig(value)), value);
   assert.deepEqual(parseConfig(serializeConfig(defaultConfig())), defaultConfig());
 });
-test("selector context is opt-in, round-trips all modes, and rejects invalid values", () => {
-  assert.equal(defaultConfig().selectorContext, undefined);
-  assert.doesNotMatch(serializeConfig(defaultConfig()), /selectorContext/);
+test("new configs use conversation, legacy omissions stay prompt-only, and modes round-trip", () => {
+  assert.equal(defaultConfig().selectorContext, "conversation");
+  assert.match(serializeConfig(defaultConfig()), /selectorContext: conversation/);
+  assert.equal(
+    parseConfig(serializeConfig({ ...defaultConfig(), selectorContext: undefined }))
+      .selectorContext,
+    undefined,
+  );
   for (const selectorContext of ["prompt", "conversation", "full"] as const) {
     const value = { ...config(), selectorContext };
     assert.deepEqual(parseConfig(serializeConfig(value)), value);

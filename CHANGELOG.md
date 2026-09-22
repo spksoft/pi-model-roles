@@ -4,6 +4,9 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ## 0.1.0 — Unreleased
 
+- New configuration files explicitly default to bounded `conversation` selector context. Existing files omitting the field remain prompt-only to avoid silently expanding sharing; use `/model-roles context conversation` to opt in on those files or `/model-roles context prompt` to opt out on new ones. `full` remains separately consented.
+- `/model-roles` now offers a main menu for Settings, enable/disable, each configured role, Run, Context, Selector, and Why. Remove the process-only session context override and its command; `/model-roles context prompt` is the durable opt-out.
+
 ### Native integration verification
 
 - Fail fast with an actionable parent-context diagnostic when the native pi-subagents test is invoked in a child process. Document the pi-subagents 0.65.1 import-time event-owner constraint instead of misattributing the example's 30-second no-response timeout to child execution. Preserve all native completion/model/effort assertions and launcher safety policies; no parent runtime routing change.
@@ -14,7 +17,6 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 - Add separately consented `selectorContext: full` and `/model-roles context [prompt|conversation|full]`. Full mode keeps newest retained text up to 100,000 UTF-8 bytes and can include tool calls/results; it excludes raw thinking, image bytes, custom entries/messages, and `!!` shell commands. It has its own consent flow, remains idle-input-only, and preserves bounded safe fallback.
 - Require explicit matching, verified selector effort for scoped thinking pins; refuse unverified configured-provider streamSimple effort forwarding. Reject coercible evaluation labels/malformed records and stop on configured selector deadlines even without a usable fallback.
 - Add an optional independent selector model/effort profile and `/model-roles selector` choose/reset disclosure flow. Preserve legacy options when absent, exact scope, execution defaults and Auto Setup settings. Explicit unsupported effort falls back without a selector-provider retry; Pi effort forwarding is currently verified for OpenAI Responses only.
-- Add `/model-roles context-session [prompt|conversation|full|inherit]`: informed conversation/full opt-in and immediate prompt-only override without file/session-entry writes. Logical-session UUID + agent-directory policy survives reload/tree/revisit within this process; simultaneous same-key hosts share it. Restart/new/fork uses global; capacity refuses new overrides rather than evicting opt-outs.
 - Add non-content projection category/partial-observation/clipping receipts, separate selector-budget trimming and unknown summary freshness to `/why`, plus approximate on-demand execution-context pressure without changing Pi compaction.
 - Add bounded opt-in paired prompt/context/fixed-baseline evaluation and diverse synthetic fixtures. The credential-free demo is explicitly a harness check, not semantic benchmark evidence. No live evaluation, superiority claim, new automatic-child/mid-task integration or equivalent-pair shortcut is included.
 
@@ -22,7 +24,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 - Fix enable/disable persistence: pause locally before saving, keep failed toggles paused, and resume enable only after a successful save in the unchanged session. Update only `enabled` against fresh locked disk state, preserving unrelated edits and checking same-value requests too. Role drafts remain revision-checked.
 - Report safe save error categories/fields and recovery guidance. Separate committed writes from later status/notification failures so a successful save is not reported as rolled back.
-- Add opt-in `selectorContext: conversation` and `/model-roles context [prompt|conversation]` with explicit sharing consent. Omitted/`prompt` stays prompt-only with unchanged initial YAML. Collect at most 12 retained active-branch text messages/summaries, 4 KiB each and 16 KiB total, with optional oldest-history removal for budget. No extra summarizer, tool calls, per-turn routing, or compaction changes.
+- Add `/model-roles context [prompt|conversation]` with explicit sharing consent for edits; legacy files omitting the field and explicit `prompt` stay prompt-only. Collect at most 12 retained active-branch text messages/summaries, 4 KiB each and 16 KiB total, with optional oldest-history removal for budget. No extra summarizer, tool calls, per-turn routing, or compaction changes.
 - Exclude raw thinking, tool calls/results, images, arbitrary custom entries and recognized skill bodies. Visible dialogue/summaries and unmarked template expansions can still contain sensitive copied text; this is not secret redaction. Opt-out does not undo prior transmission.
 - Introduce strict contextual classify/continue responses and validate continuation against the current eligible role/model/effort. Reclassify changed scope/intent; preserve explicit pins, manual state, image eligibility and safe fallback. Invalidate pending results on retained-history/configuration changes and compaction.
 - Add `/model-roles why` with metadata-only last-decision explanations and the explicit direct `selectModelWithContext` API. Existing v1 library/event APIs and the command wrapper remain prompt-only. Auto Setup describes but cannot change the context policy.
@@ -78,7 +80,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 ### Configuration and privacy
 
 - Save roles in a user-wide YAML file outside the installed package so they survive updates and removal. Detect invalid configuration and conflicting saves without silently overwriting user data.
-- By default send task text and role descriptions to the selector, not conversation history or images. The opt-in bounded conversation mode is described above. Role descriptions do not become execution instructions. The selected execution provider receives Pi's normal conversation and attachments.
+- New configs send bounded retained dialogue and summaries alongside task text and role descriptions to the selector; legacy files omitting the field and explicit prompt mode send only task/roles. Never send image bytes. Role descriptions do not become execution instructions. The selected execution provider receives Pi's normal conversation and attachments.
 - Report safe decision details and separate selector usage without creating a routing log or duplicating task text in routing metadata.
 
 ### Integrations and documentation

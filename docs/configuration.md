@@ -42,7 +42,7 @@ Auto Setup is a primary-TUI workflow for researching **one to eight** cached ava
 4. When research or refinement settles, Auto Setup opens its review automatically. No second command is required. Inspect per-model evidence state, source dates, benchmark conditions/caveats, documented upstream mappings, model and effort rationales, evidence-model references, uncertainty, and trade-offs. A suggested default has its own explanation and affects fallback execution and, unless an independent profile is set, the selector. **Discuss/refine** sends a new guarded normal-agent message with all original candidate capabilities (including unused candidates), the prior proposal, and the currently loaded configuration snapshot. If the session becomes busy before the deferred review opens, reopen the draft from the top of Settings. Ordinary chat is not captured as Auto Setup discussion.
 5. Choose whether to keep conflicts, replace individual conflicting roles, or replace all custom roles after a destructive confirmation. Confirm the final diff, which shows exact before/after model, effort and description values for changed roles, including additions/deletions and an explicitly chosen default. Retained conflicts are not shown as changes. Research and discussion alone never write `config.yaml`.
 
-Auto Setup preserves `enabled`, `selectorTimeoutMs`, `selectorContext`, the optional `selector` profile, runtime context overrides, untouched roles, the session's routing mode, and the current model/effort. An unchanged unavailable role does not prevent an otherwise valid proposed addition; a model/effort newly added or changed must still be cached as available and supported at save time. A suggested default replacement is separate and never implicit. Adding the first custom role also shows the normal future-selector cost/provider disclosure; research consent does not grant that permission.
+Auto Setup preserves `enabled`, `selectorTimeoutMs`, `selectorContext`, the optional `selector` profile, untouched roles, the session's routing mode, and the current model/effort. An unchanged unavailable role does not prevent an otherwise valid proposed addition; a model/effort newly added or changed must still be cached as available and supported at save time. A suggested default replacement is separate and never implicit. Adding the first custom role also shows the normal future-selector cost/provider disclosure; research consent does not grant that permission.
 
 The tool schema describes every nested proposal field. Each assessment's `caveats` is a required array of zero to four non-empty strings, each at most 500 characters: for example, `"caveats": ["Agent-reported; not independently verified."]`, or `"caveats": []` when none. Other report text fields such as `summary`, `rationale`, and `uncertainty` are strings, not arrays. Report text must be trimmed and contain no line breaks or ASCII control characters. In the tested Pi 0.85.1 host, schema-based argument conversion can wrap a scalar caveat in a one-item array; the package still validates the resulting report before accepting a draft. Persisted drafts must already have the canonical array shape.
 
@@ -143,7 +143,7 @@ Menu saves normalize YAML: **comments and formatting are not preserved**. The de
 | `version` | Required; `1` | Configuration format. Other versions are rejected without migration or overwriting. |
 | `enabled` | Optional; `true` | Automatic routing. `false` keeps the current model/effort; menus and explicit role use remain available. |
 | `selectorTimeoutMs` | Optional; `8000` | Selector deadline in milliseconds, including its authentication/setup. Integer from 1,000 to 60,000. Does not limit task execution or Pi's separate model-switch operation. |
-| `selectorContext` | Optional; `prompt` | `prompt` sends task/roles only. `conversation` adds bounded retained dialogue; separately consented `full` adds the newest retained tool calls/results. See below. |
+| `selectorContext` | Optional; new files: `conversation`; existing files omitting it: `prompt` | `prompt` sends task/roles only. `conversation` adds bounded retained dialogue; separately consented `full` adds the newest retained tool calls/results. See below. |
 | `selector` | Optional; absent | Independent `{model: {provider, id}, effort?: Effort}` profile; absence retains default-role classifier identity and no explicit selector effort. See below. |
 | `roles` | Required | Between 1 and 32 roles, including `default`. |
 | Role identifier | Required | Unique lowercase ID matching `[a-z][a-z0-9_-]{0,47}`. `constructor`, `prototype`, and `__proto__` are forbidden. |
@@ -171,7 +171,7 @@ The optional profile is user-wide YAML, takes effect after saving here (other se
 
 ## Selector context
 
-Prompt-only is the unchanged default; existing files require no migration. Use `/model-roles context` for a choice menu, `/model-roles context conversation` to opt in to dialogue/summaries, `/model-roles context full` to separately opt in to newest retained tool calls/results, or `/model-roles context prompt` to opt out. The saved field is:
+New configuration files explicitly default to `conversation`. Existing files omitting `selectorContext` stay prompt-only; they are not silently migrated to share history. Use `/model-roles context` for a choice menu, `/model-roles context conversation` to enable dialogue/summaries on existing files (with consent), `/model-roles context full` to separately opt in to newest retained tool calls/results, or `/model-roles context prompt` to opt out. The saved field is:
 
 ```yaml
 version: 1
@@ -182,7 +182,7 @@ roles:
     effort: inherit
 ```
 
-This command remains user-wide, not per-project. It never removes an explicit session override; its saved value may be masked here. Successful changes take effect in the current session without enabling routing or clearing a manual pause; other sessions need `/reload`. Cancellation or failed persistence leaves the previous policy active. Editing YAML directly bypasses the confirmation dialog and is an explicit opt-in. Auto Setup never changes this policy.
+This command remains user-wide, not per-project. Successful changes take effect in the current session without enabling routing or clearing a manual pause; other sessions need `/reload`. Cancellation or failed persistence leaves the previous policy active. Editing YAML directly bypasses the confirmation dialog and is an explicit opt-in. Auto Setup never changes this policy.
 
 `conversation` mode uses public retained active-branch context at idle input. It includes up to **12 user/assistant text messages or existing compaction/branch summaries**, each at most **4 KiB UTF-8**, **16 KiB total**. Recent messages take priority; truncation preserves Unicode boundaries. Oldest optional history may be dropped again to fit the selector's context window. Missing/unsupported history is safely treated as empty.
 
@@ -195,14 +195,6 @@ A clear same-task continuation may retain the previous role only while its model
 These policies cover eligible idle TUI input submissions. The `/model-roles run` wrapper and existing v1 library/event APIs stay prompt-only; the library has a separate explicit [contextual API](api.md#explicit-contextual-selection). There is no per-tool-turn, queued-follow-up, or automatic child routing.
 
 `/model-roles why` shows the last runtime decision: role/model/effort, reason/fallback, context mode/count/bytes/truncation, and selector duration/usage/cost when available. It never prints task/history text or raw replies. This explanation is not restored after reload; metadata counts describe selector input, not measured relevance or accuracy.
-
-### Logical-session context override (process only)
-
-Use `/model-roles context-session prompt` for a local opt-out with **no YAML or session-entry write**, even when config cannot be saved. `conversation` and `full` each require their matching informed sharing confirmation; `inherit` explicitly removes the override and confirms if the global policy is non-prompt. Without an override, stored/global policy applies. `/model-roles context-session` opens a chooser displaying global, override and effective policy. Global context commands retain their original meaning and do not clear the override.
-
-Scope is the **session UUID plus agent directory within this Node process**, shared by all hosts opening that same logical session/key. It is not host-local or a security boundary. Reload, tree navigation, pause/enable/disable, manual pair changes, role/profile edits and Auto Setup preserve it. Switching sessions uses the destination key; revisiting restores its override. New/forked/cloned UUIDs use global policy. Process restart expires all overrides, including prompt-only opt-outs; choose the global prompt policy for durable opt-out. No project files are loaded to expand sharing.
-
-The process map retains at most 1,024 touched session keys, including inherit tombstones needed to detect change-then-revert. At capacity it refuses new keys with a warning; existing keys remain editable and no opt-out is evicted. Pause routing if a refused opt-out cannot be set. Same-key changes invalidate pending decisions through a monotonic revision, including changes from another host and change-then-revert. Already sent context cannot be recalled, and already-started Pi model switching is still non-atomic.
 
 ### Context adequacy receipts
 

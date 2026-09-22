@@ -11,7 +11,6 @@ test("model-roles completion exposes settings, one selector toggle, configured r
     { value: "run", label: "Run command with model routing" },
     { value: "context", label: "Choose selector context (with consent)" },
     { value: "selector", label: "Choose independent selector profile" },
-    { value: "context-session", label: "Session context override (process only)" },
     { value: "why", label: "Explain the last selection" },
   ]);
   assert.deepEqual(modelRoleCommandCompletions(false, ["default"], ""), [
@@ -21,7 +20,6 @@ test("model-roles completion exposes settings, one selector toggle, configured r
     { value: "run", label: "Run command with model routing" },
     { value: "context", label: "Choose selector context (with consent)" },
     { value: "selector", label: "Choose independent selector profile" },
-    { value: "context-session", label: "Session context override (process only)" },
     { value: "why", label: "Explain the last selection" },
   ]);
   assert.deepEqual(modelRoleCommandCompletions(true, ["default", "quick"], "use q"), [

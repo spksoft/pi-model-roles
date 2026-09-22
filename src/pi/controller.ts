@@ -7,7 +7,6 @@ import {
   selectModelWithContext,
   unavailable,
 } from "../core/selection.js";
-import { contextOverride, setContextOverride, type ContextPolicy } from "./context-policy.js";
 import { projectRoutingInput, type ProjectionMetadata } from "./routing-context.js";
 import type {
   Effort,
@@ -114,22 +113,6 @@ export class RolesController {
     return this.store.snapshot
       ? piDependencies(ctx, this.store.snapshot.config, this.defaultEffort)
       : undefined;
-  }
-  contextPolicy(ctx: ExtensionContext) {
-    const override = contextOverride(this.agentDir, ctx.sessionManager.getSessionId());
-    const global = this.store.snapshot?.config.selectorContext ?? "prompt";
-    return {
-      global,
-      override: override.policy,
-      effective: override.policy ?? global,
-      revision: override.revision,
-    };
-  }
-  setContextPolicy(ctx: ExtensionContext, policy?: ContextPolicy): boolean {
-    if (!this.active || ctx.sessionManager.getSessionId() !== this.sessionId) return false;
-    if (!setContextOverride(this.agentDir, ctx.sessionManager.getSessionId(), policy)) return false;
-    this.invalidate();
-    return true;
   }
   private request(ctx: ExtensionContext, task: string, signal?: AbortSignal): SelectionRequest {
     return {
@@ -257,9 +240,8 @@ export class RolesController {
     decision: SelectionDecision,
     request: SelectionRequest,
     token: number,
-    policyCurrent: () => boolean = () => true,
   ): Promise<SelectionDecision> {
-    const valid = () => token === this.generation && policyCurrent();
+    const valid = () => token === this.generation;
     if (decision.status !== "selected") return decision;
     const session = this.sessionId;
     const dependencies = this.dependencies(ctx);
@@ -402,24 +384,18 @@ export class RolesController {
       const request = this.request(ctx, event.text, controller.signal);
       request.requiresImages ||= Boolean(event.images?.length);
       const snapshot = this.store.snapshot;
-      const policy = this.contextPolicy(ctx);
-      const policyCurrent = () => this.contextPolicy(ctx).revision === policy.revision;
+      const contextMode = snapshot.config.selectorContext ?? "prompt";
       const leaf = ctx.sessionManager.getLeafId();
       const manyRoles = Object.keys(snapshot.config.roles).length > 1;
       const projection =
-        useConversation && manyRoles && policy.effective !== "prompt"
-          ? projectRoutingInput(
-              ctx.sessionManager.buildContextEntries(),
-              this.role,
-              policy.effective,
-            )
+        useConversation && manyRoles && contextMode !== "prompt"
+          ? projectRoutingInput(ctx.sessionManager.buildContextEntries(), this.role, contextMode)
           : undefined;
       const context = projection?.context;
       const work = () => this.select(ctx, request, context);
       let decision = manyRoles ? await withSelectionLoader(ctx, controller, work) : await work();
       if (
         token !== this.generation ||
-        !policyCurrent() ||
         controller.signal.aborted ||
         !ctx.isIdle() ||
         snapshot.revision !== this.store.snapshot?.revision ||
@@ -427,7 +403,7 @@ export class RolesController {
       )
         decision = unavailable("cancelled", true);
       if (decision.status !== "cancelled")
-        decision = await this.apply(ctx, decision, request, token, policyCurrent);
+        decision = await this.apply(ctx, decision, request, token);
       if (decision.status === "cancelled") {
         if (
           this.active &&

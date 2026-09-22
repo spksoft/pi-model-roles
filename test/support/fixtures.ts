@@ -16,6 +16,7 @@ export const MODELS: AvailableModel[] = [BASE, FAST].map((ref) => ({
 export function config(): RoleConfig {
   return {
     ...defaultConfig(),
+    selectorContext: "prompt",
     roles: {
       default: { model: "inherit", effort: "inherit" },
       fast: { description: "Clear, mechanical tasks", model: FAST, effort: "low" },
