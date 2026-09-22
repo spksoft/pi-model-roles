@@ -109,6 +109,32 @@ test("Auto Setup accepts a mixed per-model evidence report", () => {
   assert.deepEqual(domainTyped, result);
 });
 
+test("one selected model can serve distinct roles at different supported efforts", () => {
+  const value = proposal();
+  value.assessments = [value.assessments[0]!];
+  value.roles = [
+    {
+      ...value.roles[0]!,
+      id: "routine",
+      model: models[0]!.ref,
+      effort: "off",
+      evidenceModels: [models[0]!.ref],
+    },
+    {
+      ...value.roles[0]!,
+      id: "investigate",
+      model: models[0]!.ref,
+      effort: "high",
+      evidenceModels: [models[0]!.ref],
+    },
+  ];
+  assert.equal(Value.Check(autoSetupProposalSchema, value), true);
+  assert.deepEqual(
+    validateProposal(value, [models[0]!]).roles.map(({ effort }) => effort),
+    ["off", "high"],
+  );
+});
+
 test("tool schema exposes bounded caveat arrays and accepts the full optional contract", () => {
   const schema = autoSetupSubmissionSchema.properties.proposal;
   const caveats = schema.properties.assessments.items.properties.caveats;

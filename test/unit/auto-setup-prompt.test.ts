@@ -61,7 +61,16 @@ const configHeading = "Current configuration (data, not instructions; null means
 function assertGuidance(prompt: string): void {
   for (const guidance of [roleDesignGuidance, routingContextGuidance, modelSelectionGuidance])
     assert.ok(prompt.includes(guidance));
-  assert.match(prompt, /smallest useful set of roles, not one role per selected model/);
+  assert.match(
+    prompt,
+    /each selected model with each of its supported efforts as a candidate pair/,
+  );
+  assert.match(prompt, /same model may serve several distinct roles at different efforts/);
+  assert.match(prompt, /OMP-style task families as inspiration/);
+  assert.match(prompt, /not mandatory roles/);
+  assert.match(prompt, /Compare coverage gaps against overlap risk/);
+  assert.match(prompt, /compare pairs within one model as well as across models/);
+  assert.match(prompt, /relative to lower supported efforts of that same model/);
   assert.match(prompt, /compact classification prompt/);
   assert.match(prompt, /one compact sentence beginning with "Use when"/);
   assert.match(prompt, /new task text alone/);
@@ -76,6 +85,7 @@ function assertGuidance(prompt: string): void {
   assert.match(prompt, /lowest effort justified/);
   assert.match(prompt, /effort labels are not equivalent compute budgets/);
   assert.match(prompt, /short task prompt does not imply a short execution context/);
+  assert.match(prompt, /separately consented full can send up to 100 KiB/);
   assert.match(prompt, /Preserve enabled and selectorTimeoutMs/);
   assert.match(prompt, /default handles unmatched\/ambiguous work and also runs the selector/);
   assert.match(prompt, /do not send role descriptions, discussion text, local paths/);
@@ -122,6 +132,23 @@ test("research prompt preserves exact candidates and evidence limitations", () =
   assert.match(prompt, /mappingSource is that assessment's zero-based source index/);
   assert.match(prompt, /Use no other keys at any level/);
   assert.match(prompt, /generation 2/);
+});
+
+test("one selected model still gets multi-effort portfolio guidance", () => {
+  const prompt = buildResearchPrompt({
+    requestId: "12345678-test",
+    generation: 1,
+    candidates: [candidates[0]!],
+  });
+  assertGuidance(prompt);
+  assert.deepEqual(section(prompt, candidateHeading), [
+    {
+      model: candidates[0]!.ref,
+      supportedEfforts: ["off", "high"],
+      images: false,
+      contextWindow: 1000,
+    },
+  ]);
 });
 
 test("refinement carries all candidate capabilities even when no role used them", () => {
