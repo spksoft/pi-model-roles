@@ -44,3 +44,7 @@
 - Update CHANGELOG.md for user-visible behavior changes, and update the manual acceptance checklist when affected workflows change. Keep historical plans clearly labeled rather than presenting them as current user guidance.
 - State compatibility requirements with Pi Agent and supported model providers explicitly.
 - Keep commits focused; do not reformat or alter unrelated files.
+
+## Focus task context
+
+Before starting work, read FOCUS_TASK.md for the active scope and constraints.
