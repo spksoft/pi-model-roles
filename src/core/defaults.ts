@@ -2,7 +2,7 @@ import type { RoleConfig } from "./types.js";
 export const LIMITS = Object.freeze({
   roles: 32,
   description: 2000,
-  task: 16384,
+  task: 65536,
   yamlBytes: 262144,
   modelField: 512,
   outputBytes: 16384,
@@ -10,6 +10,9 @@ export const LIMITS = Object.freeze({
   historyBytes: 16384,
   historyMessageBytes: 4096,
   historyMessages: 12,
+  fullHistoryBytes: 100000,
+  fullHistoryMessageBytes: 100000,
+  fullHistoryMessages: 100,
 });
 export const ROLE_ID = /^[a-z][a-z0-9_-]{0,47}$/;
 export const RESERVED_IDS = new Set(["constructor", "prototype", "__proto__"]);

@@ -407,8 +407,12 @@ export class RolesController {
       const leaf = ctx.sessionManager.getLeafId();
       const manyRoles = Object.keys(snapshot.config.roles).length > 1;
       const projection =
-        useConversation && manyRoles && policy.effective === "conversation"
-          ? projectRoutingInput(ctx.sessionManager.buildContextEntries(), this.role)
+        useConversation && manyRoles && policy.effective !== "prompt"
+          ? projectRoutingInput(
+              ctx.sessionManager.buildContextEntries(),
+              this.role,
+              policy.effective,
+            )
           : undefined;
       const context = projection?.context;
       const work = () => this.select(ctx, request, context);

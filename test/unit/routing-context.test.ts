@@ -2,14 +2,18 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { LIMITS } from "../../src/core/defaults.js";
 import { parseContextMatch } from "../../src/core/classifier-protocol.js";
-import { boundedText, validRoutingContext } from "../../src/core/routing-context.js";
+import {
+  boundedTailText,
+  boundedText,
+  validRoutingContext,
+} from "../../src/core/routing-context.js";
 import {
   selectModelForTask,
   selectModelWithContext,
   validRequest,
 } from "../../src/core/selection.js";
 import type { RoutingContext } from "../../src/core/types.js";
-import { projectRoutingContext } from "../../src/pi/routing-context.js";
+import { projectRoutingContext, projectRoutingInput } from "../../src/pi/routing-context.js";
 import { BASE, FAST, MODELS, dependencies, request } from "../support/fixtures.js";
 
 const history = (): RoutingContext => ({
@@ -62,6 +66,69 @@ test("projection allowlists dialogue and summaries including retainedTail, not t
   );
 });
 
+test("full projection includes raw retained tool data and keeps the newest 100,000 bytes", () => {
+  const { context, receipt } = projectRoutingInput(
+    [
+      { type: "custom", data: "CUSTOM_SENTINEL" },
+      {
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "THINKING_SENTINEL" },
+            { type: "toolCall", name: "read", arguments: { path: "CALL_SENTINEL" } },
+          ],
+        },
+      },
+      {
+        type: "message",
+        message: {
+          role: "toolResult",
+          toolName: "read",
+          content: [{ type: "text", text: "RESULT_SENTINEL" }],
+        },
+      },
+      {
+        type: "message",
+        message: {
+          role: "bashExecution",
+          command: "echo BASH_COMMAND_SENTINEL",
+          output: "BASH_OUTPUT_SENTINEL",
+          excludeFromContext: false,
+        },
+      },
+      {
+        type: "message",
+        message: {
+          role: "bashExecution",
+          command: "echo EXCLUDED_BASH_SENTINEL",
+          output: "EXCLUDED_BASH_SENTINEL",
+          excludeFromContext: true,
+        },
+      },
+    ],
+    undefined,
+    "full",
+  );
+  assert.equal(context.mode, "full");
+  assert.ok(validRoutingContext(context));
+  assert.match(JSON.stringify(context), /CALL_SENTINEL|RESULT_SENTINEL|BASH_OUTPUT_SENTINEL/);
+  assert.doesNotMatch(JSON.stringify(context), /THINKING|CUSTOM|EXCLUDED_BASH/);
+  assert.equal(receipt.omitted.reasoning, 1);
+  assert.equal(receipt.omitted.custom, 1);
+  assert.equal(receipt.omitted.tools, 1);
+
+  const latest = projectRoutingContext(
+    [{ type: "message", message: { role: "user", content: `OLD${"x".repeat(110000)}LATEST` } }],
+    undefined,
+    "full",
+  );
+  assert.ok(latest.truncated);
+  assert.ok(latest.messages[0]?.text.endsWith("LATEST"));
+  assert.doesNotMatch(latest.messages[0]?.text ?? "", /^OLD/);
+  assert.ok(Buffer.byteLength(latest.messages[0]?.text ?? "") <= LIMITS.fullHistoryBytes);
+});
+
 test("projection removes recognized skill bodies and bounds Unicode text without mutating entries", () => {
   const skill =
     '<skill name="demo" location="/private/skill">\nSKILL_SENTINEL\n</skill>\n\nImplement the plan';
@@ -102,6 +169,9 @@ test("projection removes recognized skill bodies and bounds Unicode text without
     const cut = boundedText("a界🌟b界🌟", bytes);
     assert.ok(Buffer.byteLength(cut) <= bytes);
     assert.ok("a界🌟b界🌟".startsWith(cut));
+    const tail = boundedTailText("a界🌟b界🌟", bytes);
+    assert.ok(Buffer.byteLength(tail) <= bytes);
+    assert.ok("a界🌟b界🌟".endsWith(tail));
   }
 });
 

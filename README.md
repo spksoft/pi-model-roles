@@ -39,9 +39,9 @@ Run these inside Pi:
 | `/model-roles disable` | Pin the current model and effort by pausing automatic selection. |
 | `/model-roles enable` | Allow the next eligible prompt to be selected automatically. |
 | `/model-roles run /command [arguments]` | Select a model, then invoke a registered command while idle; respects manual/disabled routing. |
-| `/model-roles context [prompt\|conversation]` | Choose prompt-only or opt-in bounded conversation context. |
+| `/model-roles context [prompt\|conversation\|full]` | Choose prompt-only, bounded conversation, or separately consented newest tool-output context. |
 | `/model-roles selector` | Choose/reset an independent selector model and optional effort, with provider/cost disclosure. |
-| `/model-roles context-session [prompt\|conversation\|inherit]` | Override sharing for this session in this process only; no file save. |
+| `/model-roles context-session [prompt\|conversation\|full\|inherit]` | Override sharing for this session in this process only; no file save. |
 | `/model-roles why` | Explain the last selection without displaying private task/history text. |
 
 Manual model or reasoning-effort changes also pause automatic selection. Your Pi defaults are never rewritten. Disable pauses this session even if saving fails; enable resumes only after the global toggle is saved successfully.
@@ -56,7 +56,7 @@ Prompt-only routing remains the default. To let selection interpret follow-ups s
 /model-roles context conversation
 ```
 
-Review the privacy disclosure before confirming. A clear same-task continuation can retain the existing eligible role; changed scope is reclassified, and ambiguity still falls back. This is bounded conversation context, not a full-history or per-tool-turn router. Use `/model-roles context prompt` to opt out and `/model-roles why` to inspect the decision. See [context policy and limits](docs/configuration.md#selector-context).
+Review the privacy disclosure before confirming. A clear same-task continuation can retain the existing eligible role; changed scope is reclassified, and ambiguity still falls back. Need recent raw tool calls/results too? `/model-roles context full` is a separate opt-in that sends up to 100,000 UTF-8 bytes of newest retained context; it excludes raw thinking, image bytes, custom entries/messages, and `!!` shell commands. Use `/model-roles context prompt` to opt out and `/model-roles why` to inspect the decision. See [context policy and limits](docs/configuration.md#selector-context).
 
 ### Commands that launch tasks
 
@@ -98,7 +98,7 @@ Use Settings instead of editing YAML unless you need the detailed options in the
 
 ## Cost and privacy
 
-Custom roles can add one selector request before an eligible idle TUI submission, including `/model-roles run`. By default it receives submitted task text and role descriptions only. Opt-in conversation mode also sends bounded recent dialogue and existing summaries to the configured selector provider (default-role provider unless overridden), which may differ from the execution provider. Raw thinking, tool calls/results, and images are excluded, but dialogue/summaries can still contain sensitive copied content or unmarked template expansions: this is not a secret detector. No extra summarizer or repository scan is added. The selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See [cost and privacy safeguards](docs/configuration.md#advanced-limits-and-safeguards).
+Custom roles can add one selector request before an eligible idle TUI submission, including `/model-roles run`. By default it receives submitted task text and role descriptions only. Opt-in `conversation` mode also sends bounded recent dialogue and existing summaries; opt-in `full` mode sends up to 100,000 UTF-8 bytes of newest retained dialogue, summaries, and raw tool calls/results to the configured selector provider (default-role provider unless overridden), which may differ from execution. Full mode excludes raw thinking, image bytes, custom entries/messages, and `!!` shell commands. Neither mode secret-filters text, and retained skill text may be included in full mode. No extra summarizer or repository scan is added. The selected model receives Pi's normal task context. Auto Setup uses the current agent and any tools you have enabled. See [cost and privacy safeguards](docs/configuration.md#advanced-limits-and-safeguards).
 
 Selector improvements and their remaining limits are tracked in [selector evidence and evaluation](docs/selector-evaluation.md). The credential-free demo is a harness check, not evidence of semantic superiority.
 

@@ -258,7 +258,7 @@ export async function handleCommand(
   else if (action === "why" && !parts[1]) explainRouting(controller, ctx);
   else
     ctx.ui.notify(
-      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, /model-roles context [prompt|conversation], /model-roles context-session [prompt|conversation|inherit], /model-roles selector, /model-roles why, or /model-roles run /command [arguments].",
+      "Use /model-roles settings, /model-roles enable, /model-roles disable, /model-roles use <role>, /model-roles context [prompt|conversation|full], /model-roles context-session [prompt|conversation|full|inherit], /model-roles selector, /model-roles why, or /model-roles run /command [arguments].",
       "info",
     );
 }

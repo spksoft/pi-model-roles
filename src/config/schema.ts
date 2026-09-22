@@ -46,7 +46,8 @@ export function validateConfig(value: unknown): RoleConfig {
   if (
     value.selectorContext !== undefined &&
     value.selectorContext !== "prompt" &&
-    value.selectorContext !== "conversation"
+    value.selectorContext !== "conversation" &&
+    value.selectorContext !== "full"
   )
     throw new ConfigError("invalid_selector_context", "selectorContext");
   if (value.version !== 1) throw new ConfigError("unsupported_version", "version");

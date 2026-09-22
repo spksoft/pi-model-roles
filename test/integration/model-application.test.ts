@@ -4,6 +4,7 @@ import { fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ConfigStore } from "../../src/config/store.js";
 import { RolesController } from "../../src/pi/controller.js";
+import { LIMITS } from "../../src/core/defaults.js";
 import { config } from "../support/fixtures.js";
 import { sdkHarness } from "../support/sdk.js";
 
@@ -44,7 +45,7 @@ async function harness(overrides: (pi: ExtensionAPI) => Partial<ExtensionAPI> = 
 }
 const input = { type: "input", source: "interactive", text: "Synthetic task" } as const;
 
-for (const text of ["", "  ", "x".repeat(16385)])
+for (const text of ["", "  ", "x".repeat(LIMITS.task + 1)])
   test(`empty/image-only or oversized input bypasses classification (${text.length} chars)`, {
     timeout: 5000,
   }, async () => {
@@ -64,13 +65,28 @@ for (const text of ["", "  ", "x".repeat(16385)])
       assert.equal(h.faux.state.callCount, 0);
       assert.equal(
         c.lastDecision?.reason,
-        text.length > 16384 ? "input_too_large" : "insufficient_text",
+        text.length > LIMITS.task ? "input_too_large" : "insufficient_text",
       );
       assert.equal(h.session.model?.id, "default");
     } finally {
       await h.close();
     }
   });
+
+test("long input below the task cap reaches the automatic selector", async () => {
+  const { h, c } = await harness();
+  try {
+    h.respond(fauxAssistantMessage('{"matches":["fast"]}'));
+    assert.deepEqual(await c.input({ ...input, text: "x".repeat(16385) }, h.context), {
+      action: "continue",
+    });
+    assert.equal(h.faux.state.callCount, 1);
+    assert.equal(c.lastDecision?.reason, "matched");
+    assert.equal(h.session.model?.id, "owner/fast");
+  } finally {
+    await h.close();
+  }
+});
 
 test("a failed configured default does not mask a usable inherited baseline", async () => {
   const { h, c } = await harness((pi) => ({

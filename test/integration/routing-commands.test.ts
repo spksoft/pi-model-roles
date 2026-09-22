@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fauxAssistantMessage, type FauxResponseFactory } from "@earendil-works/pi-ai";
 import { ConfigStore } from "../../src/config/store.js";
+import { LIMITS } from "../../src/core/defaults.js";
 import { config } from "../support/fixtures.js";
 import { sdkHarness } from "../support/sdk.js";
 
@@ -195,7 +196,7 @@ for (const boundary of ["default-only", "unavailable-custom", "oversized"] as co
         return fauxAssistantMessage("Default command answer");
       });
       await h.session.prompt(
-        `/plan ${boundary === "oversized" ? "x".repeat(16384) : "Synthetic task"}`,
+        `/plan ${boundary === "oversized" ? "x".repeat(LIMITS.task + 1) : "Synthetic task"}`,
       );
       assert.deepEqual(calls, ["owner/fast:low"]);
       assert.equal(h.faux.state.callCount, 1);

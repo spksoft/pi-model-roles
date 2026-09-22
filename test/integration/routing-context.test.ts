@@ -8,11 +8,14 @@ import { selectViaEvents } from "../../src/api/events.js";
 import { config, request } from "../support/fixtures.js";
 import { sdkHarness } from "../support/sdk.js";
 
-async function conversationConfig(h: Awaited<ReturnType<typeof sdkHarness>>) {
+async function contextConfig(
+  h: Awaited<ReturnType<typeof sdkHarness>>,
+  selectorContext: "conversation" | "full" = "conversation",
+) {
   const store = new ConfigStore(h.dir);
   const snapshot = await store.load();
   assert.ok(snapshot);
-  await store.save({ ...config(), selectorContext: "conversation" }, snapshot.revision);
+  await store.save({ ...config(), selectorContext }, snapshot.revision);
   await h.session.reload();
   return store;
 }
@@ -28,7 +31,7 @@ test("real idle input supplies retained dialogue, continues the same role, and p
   try {
     h.respond(fauxAssistantMessage("The label should be corrected; one occurrence remains."));
     await h.session.prompt("Change the label using these explicit acceptance criteria.");
-    await conversationConfig(h);
+    await contextConfig(h);
     h.respond(
       (context) => {
         const data = selectorData(context);
@@ -100,8 +103,31 @@ test("context consent cancellation writes nothing; accepting preserves enabled a
     assert.equal(store.snapshot?.config.enabled, false);
     await h.session.prompt("/model-roles context prompt");
     assert.equal((await store.load())?.config.selectorContext, "prompt");
+    h.ui.answers.push(false);
+    await h.session.prompt("/model-roles context full");
+    assert.equal((await store.load())?.config.selectorContext, "prompt");
+    assert.match(h.ui.confirmations.at(-1)?.message ?? "", /100,000 UTF-8 bytes/);
+    h.ui.answers.push(true);
+    await h.session.prompt("/model-roles context full");
+    assert.equal((await store.load())?.config.selectorContext, "full");
     assert.equal(h.faux.state.callCount, 0);
     assert.match(h.ui.statuses.get("model-roles") ?? "", /auto-selector=disabled/);
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.close();
+  }
+});
+
+test("full idle context reaches the selector only after opt-in", async () => {
+  const h = await sdkHarness();
+  try {
+    await contextConfig(h, "full");
+    h.respond((context) => {
+      assert.equal((selectorData(context).context as { mode?: string }).mode, "full");
+      return fauxAssistantMessage('{"action":"classify","matches":["fast"]}');
+    });
+    await h.session.prompt("Use the retained context for this task.");
+    assert.equal(h.session.model?.id, "owner/fast");
     assert.deepEqual(h.errors, []);
   } finally {
     await h.close();
@@ -111,7 +137,7 @@ test("context consent cancellation writes nothing; accepting preserves enabled a
 test("v1 event service stays prompt-only even when TUI context is conversation", async () => {
   const h = await sdkHarness();
   try {
-    await conversationConfig(h);
+    await contextConfig(h);
     h.respond((context) => {
       assert.equal(selectorData(context).context, undefined);
       return fauxAssistantMessage('{"matches":["fast"]}');
@@ -145,7 +171,7 @@ test("command wrapper stays prompt-only after opting into idle-input conversatio
   try {
     h.respond(fauxAssistantMessage("PRIVATE_DIALOGUE_SENTINEL"));
     await h.session.prompt("A synthetic previous task");
-    await conversationConfig(h);
+    await contextConfig(h);
     h.respond((context) => {
       assert.equal(selectorData(context).context, undefined);
       assert.doesNotMatch(JSON.stringify(context), /PRIVATE_DIALOGUE_SENTINEL/);
@@ -187,7 +213,7 @@ test("failed context save preserves prior policy and manual pause without disclo
 test("history changes during the selector discard its result instead of using a stale antecedent", async () => {
   const h = await sdkHarness();
   try {
-    await conversationConfig(h);
+    await contextConfig(h);
     h.respond((context) => {
       assert.ok(selectorData(context).context);
       h.session.sessionManager.appendCustomEntry("synthetic-navigation", { version: 1 });

@@ -1,4 +1,4 @@
-export type ContextPolicy = "prompt" | "conversation";
+export type ContextPolicy = "prompt" | "conversation" | "full";
 interface PolicyState {
   policy?: ContextPolicy;
   revision: number;
@@ -25,7 +25,8 @@ export function setContextOverride(
   sessionId: string,
   policy?: ContextPolicy,
 ): boolean {
-  if (policy !== undefined && policy !== "prompt" && policy !== "conversation") return false;
+  if (policy !== undefined && policy !== "prompt" && policy !== "conversation" && policy !== "full")
+    return false;
   const id = key(agentDir, sessionId);
   if (!state.entries.has(id) && state.entries.size >= CONTEXT_OVERRIDE_LIMIT) return false;
   // Keep tombstones on inherit: change-then-revert must invalidate pending selections.

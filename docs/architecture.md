@@ -43,7 +43,7 @@ Settings and Auto Setup
 
 Automatic routing applies only to a new interactive prompt submitted while a primary TUI session is idle. This includes registered prompt templates such as `/plan <description>` and `/skill:name <task>`. It does not independently reroute tools, retries, steering, queued follow-ups, extension-generated messages, headless sessions, or known subagent children.
 
-This is an explicit host boundary: Pi 0.85.1 snapshots model/effort before its `context` hook. The package does not switch models there or project full conversation history for classification. It selects at `input`, before the supported pre-prompt preparation/dispatch boundary, with submitted task text and optionally a bounded retained-conversation projection. See [per-turn compatibility](compatibility.md#per-turn-routing-is-not-supported).
+This is an explicit host boundary: Pi 0.85.1 snapshots model/effort before its `context` hook. The package does not switch models there. It selects at `input`, before the supported pre-prompt preparation/dispatch boundary, with submitted task text and an optional bounded retained-context projection. See [per-turn compatibility](compatibility.md#per-turn-routing-is-not-supported).
 
 ```text
 New eligible prompt
@@ -53,7 +53,7 @@ New eligible prompt
   -> Are custom roles eligible?
      -> no: use default fallback without a classifier request
      -> yes: ask the independent selector or resolved default model for matching role IDs
-  -> Conversation mode establishes unchanged task/role continuity?
+  -> Context mode establishes unchanged task/role continuity?
      -> yes: retain the still-eligible current assignment
      -> no: evaluate role matches
   -> Exactly one valid match?
@@ -65,11 +65,11 @@ New eligible prompt
 
 Slash-prefixed submissions are checked against Pi's current public `getCommands()` metadata. Only prompt-template and skill sources are eligible; extension-owned and unknown commands are not. Pi dispatches registered extension commands before `input`, so a command that shadows a template remains outside automatic routing. Existing command registrations and handlers are never replaced or re-registered. Metadata is read locally on each eligible slash submission, so resource reloads do not leave a stale allowlist.
 
-In default prompt mode, the selector sees submitted task text (including raw command/arguments) and eligible role IDs/descriptions only. Opt-in conversation mode adds the bounded active-branch projection from `src/pi/routing-context.ts`: recent user/assistant text and existing summaries, with raw thinking, tool calls/results, image bytes, and arbitrary custom entries excluded. Recognized Pi skill envelopes are reduced to their invocation; unmarked past template expansions and sensitive text copied into dialogue/summaries may remain. There are no new file reads or summarizer requests. The public `buildContextEntries()` projection respects compaction and retained tails, not abandoned branches. Context-window budget checks can discard oldest optional history, never the submitted task. See [context policy](configuration.md#selector-context).
+In default prompt mode, the selector sees submitted task text (including raw command/arguments) and eligible role IDs/descriptions only. Opt-in `conversation` mode adds a bounded active-branch projection from `src/pi/routing-context.ts`: recent user/assistant text and existing summaries, with raw thinking, tool calls/results, image bytes, and arbitrary custom entries excluded. Separately consented `full` mode retains newest text up to 100,000 UTF-8 bytes and adds raw tool calls/results; it still excludes raw thinking, image bytes, custom entries/messages, and `!!` shell commands. Recognized Pi skill envelopes are reduced to their invocation only in conversation mode; retained full-mode skill text may remain. There are no new file reads or summarizer requests. The public `buildContextEntries()` projection respects compaction and retained tails, not abandoned branches. Context-window budget checks can discard oldest optional context, never the submitted task. See [context policy](configuration.md#selector-context).
 
 Pi expands the unchanged submission after routing; cancellation restores the original command. Later extension injections and provider serialization are not visible at this boundary. A strict contextual result either classifies role matches or requests continuation; the latter requires retained dialogue and an unchanged eligible prior role/model/effort matching the current pair. History cannot grant model, tool, or provider permissions. Its semantic interpretation remains model judgment, not a deterministic correctness guarantee.
 
-The selected pair remains active for tools, retries, and queued follow-ups. The next eligible idle submission uses the independent profile (or default model when absent) as its selector; a clear same-task continuation in conversation mode may retain the prior execution pair. Otherwise the usual role-match/default fallback applies. Contextual results are discarded if branch/leaf or configuration revision changes during selection, and compaction invalidates pending selection. Receipts contain counts and reason codes, not copied conversation text.
+The selected pair remains active for tools, retries, and queued follow-ups. The next eligible idle submission uses the independent profile (or default model when absent) as its selector; a clear same-task continuation in either context mode may retain the prior execution pair. Otherwise the usual role-match/default fallback applies. Contextual results are discarded if branch/leaf or configuration revision changes during selection, and compaction invalidates pending selection. Receipts contain counts and reason codes, not copied context text.
 
 ## Explicit command routing
 
@@ -84,7 +84,7 @@ Explicit run while idle
   -> Original handler or normal template/skill expansion
 ```
 
-No target file or generated prompt is read for selection. This wrapper stays prompt-only even when idle-input conversation mode is enabled. Target-generated messages retain `source=extension`, so they do not trigger a second selector. An intervening agent start invalidates pending selection, as do manual changes, reload/navigation, and shutdown. Cancellation restores the wrapper text without dispatch. Once handed off, the original command owns execution, model overrides, permissions, and any child launches. Public dispatch is fire-and-forget; the wrapper neither reports target completion nor retries or rolls back target effects. See [command boundaries](compatibility.md#run-an-extension-owned-command).
+No target file or generated prompt is read for selection. This wrapper stays prompt-only even when idle-input conversation or full mode is enabled. Target-generated messages retain `source=extension`, so they do not trigger a second selector. An intervening agent start invalidates pending selection, as do manual changes, reload/navigation, and shutdown. Cancellation restores the wrapper text without dispatch. Once handed off, the original command owns execution, model overrides, permissions, and any child launches. Public dispatch is fire-and-forget; the wrapper neither reports target completion nor retries or rolls back target effects. See [command boundaries](compatibility.md#run-an-extension-owned-command).
 
 ## Precedence and fallback
 

@@ -28,7 +28,7 @@ export interface RoleConfig {
   selectorTimeoutMs: number;
   selector?: SelectorProfile;
   /** Idle-TUI routing data policy; omitted means prompt. Library v1 calls stay prompt-only. */
-  selectorContext?: "prompt" | "conversation";
+  selectorContext?: "prompt" | "conversation" | "full";
   roles: { default: DefaultRole } & Record<string, DefaultRole | CustomRole>;
 }
 export interface AvailableModel {
@@ -80,13 +80,15 @@ export interface SelectorMetadata {
 }
 export interface RoutingContext {
   version: 1;
+  /** Full mode permits the larger retained-context limits. Omitted preserves legacy conversation limits. */
+  mode?: "full";
   messages: Array<{ kind: "user" | "assistant" | "summary"; text: string }>;
   truncated: boolean;
   previousRole?: string;
 }
 /** Non-content receipt only: safe to persist without copying conversation text. */
 export interface RoutingMetadata {
-  mode: "prompt" | "conversation";
+  mode: "prompt" | "conversation" | "full";
   messages: number;
   historyBytes: number;
   truncated: boolean;

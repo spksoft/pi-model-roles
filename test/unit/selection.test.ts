@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defaultConfig } from "../../src/core/defaults.js";
+import { defaultConfig, LIMITS } from "../../src/core/defaults.js";
 import { bounded, DeadlineError } from "../../src/core/async.js";
 import { parseMatches } from "../../src/core/classifier-protocol.js";
 import { selectModelForTask } from "../../src/core/selection.js";
@@ -94,16 +94,22 @@ test("fallback is finite, revalidated, capability-aware and independent of curre
     "unavailable",
   );
 });
-test("large, insufficient and context-limited tasks bypass rather than truncate", async () => {
+test("long tasks classify intact until the bounded cap", async () => {
+  const task = "x".repeat(16385);
+  const deps = dependencies();
+  deps.classify = async (input) => {
+    assert.equal(JSON.parse(input.text).task, task);
+    return { text: '{"matches":["fast"]}' };
+  };
+  assert.equal((await selectModelForTask(request({ task }), deps)).reason, "matched");
   assert.equal(
-    (await selectModelForTask(request({ task: "x".repeat(16385) }), dependencies())).reason,
+    (await selectModelForTask(request({ task: "x".repeat(LIMITS.task + 1) }), deps)).reason,
     "input_too_large",
   );
   assert.equal(
-    (await selectModelForTask(request({ task: "  " }), dependencies())).reason,
+    (await selectModelForTask(request({ task: "  " }), deps)).reason,
     "insufficient_text",
   );
-  const deps = dependencies();
   deps.models = () => MODELS.map((model) => ({ ...model, contextWindow: 100 }));
   assert.equal((await selectModelForTask(request(), deps)).reason, "context_budget");
 });

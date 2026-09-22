@@ -70,13 +70,21 @@ export async function confirmFirstCustomRoleRouting(
   controller?: RolesController,
 ): Promise<boolean> {
   if (Object.keys(before.roles).length !== 1 || Object.keys(after.roles).length <= 1) return true;
+  const effectiveContext =
+    controller?.contextPolicy(ctx).effective ?? after.selectorContext ?? "prompt";
+  let historyDisclosure =
+    "History, tool results, image bytes, and loaded system/template/skill/context files are not automatically collected. ";
+  if (effectiveContext === "full")
+    historyDisclosure =
+      "For ordinary idle input (not the command wrapper), full mode sends up to 100,000 UTF-8 bytes of newest retained user/assistant text and summaries, including raw tool calls/results. Raw thinking, image bytes, custom entries/messages, and !! shell commands are excluded; retained skill text may be included. ";
+  else if (effectiveContext === "conversation")
+    historyDisclosure =
+      "For ordinary idle input (not the command wrapper), conversation mode also sends bounded retained user/assistant text and summaries; these may include sensitive copied content and unmarked template expansions. Raw thinking, tool calls/results and image bytes are excluded; loaded files are not collected separately. ";
   return ctx.ui.confirm(
     "Enable task-based model selection?",
-    `Selector: ${displayModel(after.selector?.model ?? (after.roles.default.model === "inherit" ? controller?.baseline.model : after.roles.default.model))}; effort: ${after.selector?.effort ?? "adapter default"}. Global context: ${after.selectorContext ?? "prompt"}; effective here: ${controller?.contextPolicy(ctx).effective ?? after.selectorContext ?? "prompt"}. Existing session overrides are preserved. ` +
+    `Selector: ${displayModel(after.selector?.model ?? (after.roles.default.model === "inherit" ? controller?.baseline.model : after.roles.default.model))}; effort: ${after.selector?.effort ?? "adapter default"}. Global context: ${after.selectorContext ?? "prompt"}; effective here: ${effectiveContext}. Existing session overrides are preserved. ` +
       "Each eligible new idle TUI submission, including an explicit /model-roles run command, may make one extra request to the configured selector provider (default-role provider unless an independent profile is set; cost and latency). The selector receives submitted task text and role descriptions. " +
-      ((controller?.contextPolicy(ctx).effective ?? after.selectorContext) === "conversation"
-        ? "For ordinary idle input (not the command wrapper), conversation mode also sends bounded retained user/assistant text and summaries; these may include sensitive copied content and unmarked template expansions. Raw thinking, tool calls/results and image bytes are excluded; loaded files are not collected separately. "
-        : "History, tool results, image bytes, and loaded system/template/skill/context files are not automatically collected. ") +
+      historyDisclosure +
       "Text included in selection is not secret-filtered. Tool-loop turns, queued follow-ups, and Auto Setup are not independently rerouted. The execution provider still receives Pi's normal conversation.",
   );
 }

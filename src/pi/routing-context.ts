@@ -1,6 +1,6 @@
 import { LIMITS } from "../core/defaults.js";
 import { isRecord } from "../core/model-identity.js";
-import { boundedText } from "../core/routing-context.js";
+import { boundedTailText, boundedText } from "../core/routing-context.js";
 import type { RoutingContext } from "../core/types.js";
 
 export interface ProjectionMetadata {
@@ -49,8 +49,20 @@ function withoutSkillBody(text: string, scan: Scan): string {
   scan.receipt.omitted.skillBodies++;
   return `/skill:${skill[1]}${skill[2] ? ` ${skill[2]}` : ""}`;
 }
-function visibleText(content: unknown, scan: Scan): { text: string; truncated: boolean } {
-  let text = "";
+function toolCallText(block: Record<string, unknown>): string {
+  try {
+    return `[Tool call ${JSON.stringify({ name: block.name, arguments: block.arguments })}]`;
+  } catch {
+    return "[Tool call with unserializable arguments]";
+  }
+}
+function visibleText(
+  content: unknown,
+  scan: Scan,
+  mode: "conversation" | "full",
+  prefix = "",
+): { text: string; truncated: boolean } {
+  const parts = prefix ? [prefix] : [];
   let truncated = false;
   const blocks = typeof content === "string" ? [{ type: "text", text: content }] : content;
   if (Array.isArray(blocks))
@@ -61,26 +73,28 @@ function visibleText(content: unknown, scan: Scan): { text: string; truncated: b
       }
       if (!isRecord(block)) continue;
       if (block.type === "thinking") scan.receipt.omitted.reasoning++;
-      else if (block.type === "toolCall") scan.receipt.omitted.tools++;
-      else if (block.type === "image") scan.receipt.omitted.images++;
+      else if (block.type === "toolCall") {
+        if (mode === "full") parts.push(toolCallText(block));
+        else scan.receipt.omitted.tools++;
+      } else if (block.type === "image") scan.receipt.omitted.images++;
       if (block.type !== "text" || typeof block.text !== "string") continue;
-      const room = LIMITS.historyMessageBytes - Buffer.byteLength(text);
-      const cleaned = withoutSkillBody(block.text, scan);
-      const part = boundedText(cleaned, Math.max(0, room - (text ? 1 : 0)));
-      text += (text && part ? "\n" : "") + part;
-      truncated ||= part.length < block.text.length;
-      if (part.length < cleaned.length) {
-        scan.receipt.byteLimit = true;
-        scan.receipt.observationsPartial = true;
-        break;
-      }
+      parts.push(mode === "full" ? block.text : withoutSkillBody(block.text, scan));
     }
+  const source = parts.filter(Boolean).join("\n");
+  const maxBytes = mode === "full" ? LIMITS.fullHistoryMessageBytes : LIMITS.historyMessageBytes;
+  const text = mode === "full" ? boundedTailText(source, maxBytes) : boundedText(source, maxBytes);
+  truncated ||= text.length < source.length;
+  if (truncated) {
+    scan.receipt.byteLimit = true;
+    scan.receipt.observationsPartial = true;
+  }
   return { text, truncated };
 }
 /** Projection-only receipt is deliberately separate from the strict direct API context. */
 export function projectRoutingInput(
   entries: readonly unknown[],
   previousRole?: string,
+  mode: "conversation" | "full" = "conversation",
 ): { context: RoutingContext; receipt: ProjectionMetadata } {
   const receipt: ProjectionMetadata = {
     included: { user: 0, assistant: 0, summary: 0 },
@@ -91,37 +105,51 @@ export function projectRoutingInput(
     summaryFreshness: "not_present",
   };
   const scan: Scan = { remaining: 4096, receipt };
+  const full = mode === "full";
+  const messageLimit = full ? LIMITS.fullHistoryMessages : LIMITS.historyMessages;
+  const byteLimit = full ? LIMITS.fullHistoryBytes : LIMITS.historyBytes;
   const context: RoutingContext = {
     version: 1,
+    ...(full ? { mode: "full" as const } : {}),
     messages: [],
     truncated: false,
     ...(previousRole ? { previousRole } : {}),
   };
-  let remaining: number = LIMITS.historyBytes;
+  let remaining: number = byteLimit;
   for (const message of retainedMessages(entries, scan)) {
     if (!isRecord(message)) continue;
-    const kind =
-      message.role === "user" || message.role === "assistant"
-        ? message.role
-        : message.role === "compactionSummary" || message.role === "branchSummary"
-          ? "summary"
-          : undefined;
-    if (!kind) {
-      if (message.role === "toolResult" || message.role === "bashExecution")
-        receipt.omitted.tools++;
-      else if (message.role === "custom") receipt.omitted.custom++;
-      continue;
-    }
-    const visible = visibleText(kind === "summary" ? message.summary : message.content, scan);
+    let kind: "user" | "assistant" | "summary" | undefined;
+    let content: unknown;
+    let prefix = "";
+    if (message.role === "user" || message.role === "assistant") {
+      kind = message.role;
+      content = message.content;
+    } else if (message.role === "compactionSummary" || message.role === "branchSummary") {
+      kind = "summary";
+      content = message.summary;
+    } else if (full && message.role === "toolResult") {
+      kind = "assistant";
+      content = message.content;
+      prefix = `[Tool result ${typeof message.toolName === "string" ? message.toolName : "unknown"}${message.isError === true ? " (error)" : ""}]`;
+    } else if (full && message.role === "bashExecution" && message.excludeFromContext !== true) {
+      kind = "assistant";
+      content = `[Bash command]\n${typeof message.command === "string" ? message.command : ""}\n[Bash output]\n${typeof message.output === "string" ? message.output : ""}`;
+    } else if (message.role === "toolResult" || message.role === "bashExecution")
+      receipt.omitted.tools++;
+    else if (message.role === "custom") receipt.omitted.custom++;
+    if (!kind) continue;
+    const visible = visibleText(content, scan, mode, prefix);
     if (!visible.text.trim()) continue;
-    if (context.messages.length >= LIMITS.historyMessages || remaining === 0) {
-      receipt.messageLimit = context.messages.length >= LIMITS.historyMessages;
+    if (context.messages.length >= messageLimit || remaining === 0) {
+      receipt.messageLimit = context.messages.length >= messageLimit;
       receipt.byteLimit ||= remaining === 0;
       receipt.observationsPartial = true;
       context.truncated = true;
       break;
     }
-    const text = boundedText(visible.text, remaining);
+    const text = full
+      ? boundedTailText(visible.text, remaining)
+      : boundedText(visible.text, remaining);
     receipt.byteLimit ||= text.length < visible.text.length;
     context.truncated ||= visible.truncated || text.length < visible.text.length;
     if (text.trim()) {
@@ -135,10 +163,11 @@ export function projectRoutingInput(
   context.messages.reverse();
   return { context, receipt };
 }
-/** Backward-compatible pure projection: no tools, file reads or extra model calls. */
+/** Backward-compatible pure projection with default conversation exclusions. */
 export function projectRoutingContext(
   entries: readonly unknown[],
   previousRole?: string,
+  mode: "conversation" | "full" = "conversation",
 ): RoutingContext {
-  return projectRoutingInput(entries, previousRole).context;
+  return projectRoutingInput(entries, previousRole, mode).context;
 }

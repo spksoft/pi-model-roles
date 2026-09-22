@@ -100,7 +100,7 @@ Your adapter owns authentication, availability, scope, and trusted finite capabi
 
 ## Explicit contextual selection
 
-`selectModelWithContext(request, dependencies, context)` is a separate opt-in direct API. The existing `selectModelForTask` and `pi-model-roles:select:v1` contracts remain prompt-only even when configuration contains `selectorContext: conversation`; unknown request keys (including `context`) remain invalid. The direct contextual call is explicit consent by its caller and does not read a Pi session or depend on the configured TUI context mode.
+`selectModelWithContext(request, dependencies, context)` is a separate opt-in direct API. The existing `selectModelForTask` and `pi-model-roles:select:v1` contracts remain prompt-only even when configuration uses a non-prompt `selectorContext`; unknown request keys (including `context`) remain invalid. The direct contextual call is explicit consent by its caller and does not read a Pi session or depend on the configured TUI context mode.
 
 ```ts
 import { selectModelWithContext } from "pi-model-roles";

@@ -24,19 +24,20 @@ export async function configureRoutingContext(
     requested ??
     (await ctx.ui.select(
       `Selector context (current: ${snapshot.config.selectorContext ?? "prompt"})`,
-      ["prompt", "conversation"],
+      ["prompt", "conversation", "full"],
     ));
   if (!mode || !current()) return;
-  if (mode !== "prompt" && mode !== "conversation") {
-    ctx.ui.notify("Use /model-roles context [prompt|conversation].", "info");
+  if (mode !== "prompt" && mode !== "conversation" && mode !== "full") {
+    ctx.ui.notify("Use /model-roles context [prompt|conversation|full].", "info");
     return;
   }
   if (
-    mode === "conversation" &&
+    mode !== "prompt" &&
     !(await ctx.ui.confirm(
-      "Allow conversation context in model selection?",
-      conversationDisclosure(
+      `Allow ${mode} context in model selection?`,
+      contextDisclosure(
         controller,
+        mode,
         "This user-wide choice takes effect here after saving; other sessions require /reload. Session overrides are preserved and may mask it.",
       ),
     ))
@@ -71,7 +72,7 @@ export function explainRouting(controller: RolesController, ctx: ExtensionContex
     const routing = decision.routing;
     if (routing)
       lines.push(
-        `Prepared context: ${routing.mode}; ${routing.messages} messages; ${routing.historyBytes} text bytes; truncated: ${routing.truncated}. Excluded: raw thinking, tool calls/results, image bytes, arbitrary custom entries, system/skill files.`,
+        `Prepared context: ${routing.mode}; ${routing.messages} messages; ${routing.historyBytes} text bytes; truncated: ${routing.truncated}. ${routing.mode === "full" ? "Includes raw retained tool calls/results; excludes raw thinking, image bytes, custom entries/messages, and !! shell commands." : "Excludes raw thinking, tool calls/results, image bytes, arbitrary custom entries, system/skill files."}`,
       );
     if (routing)
       lines.push(
@@ -118,7 +119,13 @@ export function policySummary(controller: RolesController, ctx: ExtensionContext
   const policy = controller.contextPolicy(ctx);
   return `Global context: ${policy.global}; session override: ${policy.override ?? "inherit"}; effective context: ${policy.effective}. Override lasts only in this process (including reload/tree/revisit); same session UUID and agent directory share it across hosts. New/forked sessions and process restart use global. Already transmitted requests cannot be undone.`;
 }
-function conversationDisclosure(controller: RolesController, scope: string): string {
+function contextDisclosure(
+  controller: RolesController,
+  mode: "conversation" | "full",
+  scope: string,
+): string {
+  if (mode === "full")
+    return `Future eligible idle submissions may send up to 100,000 UTF-8 bytes of newest retained active-branch user/assistant text and summaries, including raw tool calls and results, to the selector provider/model ${selectorLabel(controller)}, which may differ from the execution provider. Raw thinking, image bytes, custom entries/messages, and !! shell commands remain excluded. Expanded skill text already retained in the conversation may be included. Tool output and all text are untrusted data, are not secret-filtered, can be sensitive, and can increase cost/latency. The selector may discard oldest retained records to fit its context window. No extra summarizer, tool calls, or mid-task switching is added. ${scope}`;
   return `Future eligible idle submissions may send up to 12 recent user/assistant text messages and existing summaries (16 KiB text total, 4 KiB per message) to the selector provider/model ${selectorLabel(controller)}, which may differ from the execution provider. History is taken only from retained active-branch context. Raw thinking, tool calls/results, images, arbitrary custom entries and loaded system/skill files are excluded; visible text and summaries can still contain sensitive information copied from them and unmarked past template expansions. Recognized skill envelopes are reduced to their invocation. This is not secret redaction. History can increase cost/latency and may be incomplete or stale. No extra summarizer, tool calls, or mid-task switching is added. ${scope}`;
 }
 export async function configureSessionContext(
@@ -130,18 +137,29 @@ export async function configureSessionContext(
   const before = controller.contextPolicy(ctx);
   const mode =
     requested ??
-    (await ctx.ui.select(policySummary(controller, ctx), ["prompt", "conversation", "inherit"]));
+    (await ctx.ui.select(policySummary(controller, ctx), [
+      "prompt",
+      "conversation",
+      "full",
+      "inherit",
+    ]));
   if (!current() || !mode) return;
-  if (mode !== "prompt" && mode !== "conversation" && mode !== "inherit") {
-    notifySafely(ctx, "Use /model-roles context-session [prompt|conversation|inherit].", "info");
+  if (mode !== "prompt" && mode !== "conversation" && mode !== "full" && mode !== "inherit") {
+    notifySafely(
+      ctx,
+      "Use /model-roles context-session [prompt|conversation|full|inherit].",
+      "info",
+    );
     return;
   }
+  const disclosureMode = mode === "inherit" ? before.global : mode;
   if (
-    (mode === "conversation" || (mode === "inherit" && before.global === "conversation")) &&
+    disclosureMode !== "prompt" &&
     !(await ctx.ui.confirm(
-      "Allow conversation context for this logical session?",
-      conversationDisclosure(
+      `Allow ${disclosureMode} context for this logical session?`,
+      contextDisclosure(
         controller,
+        disclosureMode,
         policySummary(controller, ctx) +
           " This change shares one logical-session override across hosts opening the same UUID under the same agent directory in this process. No YAML or session-entry save. Unrelated actions do not clear it.",
       ),
