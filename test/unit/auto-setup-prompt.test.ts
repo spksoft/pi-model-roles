@@ -63,9 +63,13 @@ function assertGuidance(prompt: string): void {
     assert.ok(prompt.includes(guidance));
   assert.match(
     prompt,
-    /each selected model with each of its supported efforts as a candidate pair/,
+    /combinations of each selected model with each of its supported efforts as candidate pairs/,
   );
   assert.match(prompt, /same model may serve several distinct roles at different efforts/);
+  assert.match(
+    prompt,
+    /Automatically construct role configurations by choosing a justified model\/effort pair/,
+  );
   assert.match(prompt, /OMP-style task families as inspiration/);
   assert.match(prompt, /not mandatory roles/);
   assert.match(prompt, /Compare coverage gaps against overlap risk/);
@@ -123,6 +127,10 @@ test("research prompt preserves exact candidates and evidence limitations", () =
     })),
   );
   assert.equal(section(prompt, configHeading), null);
+  assert.match(
+    prompt,
+    /Automatically propose role configurations from the selected models × their supported efforts/,
+  );
   assert.match(prompt, /no new role is useful/);
   assertGuidance(prompt);
   assertProposalContract(prompt);

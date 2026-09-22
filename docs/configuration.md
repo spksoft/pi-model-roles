@@ -34,7 +34,7 @@ The picker uses cached available models within Pi's current scope. It does not r
 
 ## Auto Setup
 
-Auto Setup is a primary-TUI workflow for researching **one to eight** cached available models and proposing ordinary role changes. It has no YAML settings and does not configure providers, credentials, search services, or Pi's tool permissions.
+Auto Setup is the automatic mode for generating role configurations: it researches **one to eight** cached available models, considers each model combined with each supported reasoning effort, and proposes ordinary role changes for user review. It does not create a role for every combination or save without confirmation. It has no YAML settings and does not configure providers, credentials, search services, or Pi's tool permissions.
 
 1. Open `/model-roles settings`, select the top **Auto Setup** item, then choose models with Space or Tab and continue with Enter. Use the shared [model picker controls](#model-picker-controls) to search and navigate pages. Escape cancels immediately.
 2. Read and confirm the disclosure. Research uses the **current Pi model** without switching it. The generated prompt includes selected candidates' exact IDs, supported efforts, image support and context windows, plus the loaded configuration snapshot's role descriptions/assignments, `enabled`, `selectorTimeoutMs`, the stored/global `selectorContext`, and optional independent `selector` profile. The model also receives its normal Pi conversation/provider flow and may use the tools you already configured. Do not put secrets in descriptions. Tool providers can make requests, charge, or retain data under their own policies. Auto Setup does not sandbox them.

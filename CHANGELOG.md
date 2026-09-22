@@ -52,6 +52,7 @@ User-visible changes to pi-model-roles. For installation and everyday use, start
 
 ### Auto Setup
 
+- Clarify Auto Setup as automatic role-configuration proposal generation from selected model × supported-effort combinations, with distinct task boundaries and explicit approval rather than a role per pair or an automatic save.
 - Research each selected model at its supported efforts as candidate pairs, including multiple role/effort assignments for one model. Favor broad, distinguishable whole-task coverage over a fixed minimal role count; OMP-style task families are examples, not promises of mode or subsystem routing. Keep evidence and overlap safeguards, and correct the prompt's full-context description.
 - Give research and refinement an allowlisted, bounded snapshot of existing roles/settings and exact candidate capabilities; refinement no longer relies on conversation history for supported efforts or unused models. Disclose the added configuration context and reject over-limit prompts before dispatch.
 - Apply prompt/context-engineering guidance to task-fit comparisons, whole-task routing boundaries, existing-role overlap checks, provisional effort selection, default/selector trade-offs, and targeted public-model research. Request reviewable synthetic match/near-miss examples without claiming measured accuracy; keep the proposal/YAML schemas and top-level settings unchanged.
